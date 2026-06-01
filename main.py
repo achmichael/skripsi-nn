@@ -28,9 +28,9 @@ from src.models.neural_network import NeuralNetwork
 from src.config.config import config
 
 def save_loss_curve(history: dict, save_path: str, model_type: str):
-    """Plot dan simpan training loss curve berisi train loss dan validation loss."""
+    """Plot training loss curve dengan titik per epoch, anotasi best loss, dan val loss."""
     train_loss = history.get("train_loss", [])
-    val_loss = history.get("val_loss", [])
+    val_loss   = history.get("val_loss", [])
 
     if not train_loss:
         raise ValueError("Train loss kosong. Tidak bisa membuat kurva loss.")
@@ -38,32 +38,54 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
     trained_epochs = len(train_loss)
     epoch_axis = list(range(1, trained_epochs + 1))
 
-    plt.figure(figsize=(10, 6))
+    # Ukuran marker: kecil jika banyak epoch agar tidak berantakan
+    marker_size = max(1.5, 5.0 - trained_epochs * 0.008)
 
-    plt.plot(
-        epoch_axis,
-        train_loss,
-        linewidth=1.5,
+    fig, ax = plt.subplots(figsize=(12, 6))
+
+    # --- Train loss ---
+    ax.plot(
+        epoch_axis, train_loss,
+        color="#1565C0", linewidth=1.5,
+        marker="o", markersize=marker_size, markerfacecolor="#1565C0",
         label="Train Loss",
+        zorder=3,
     )
 
+    # --- Validation loss ---
     if val_loss:
-        plt.plot(
-            epoch_axis,
-            val_loss,
-            linewidth=1.5,
+        ax.plot(
+            epoch_axis, val_loss,
+            color="#E53935", linewidth=1.5,
+            marker="o", markersize=marker_size, markerfacecolor="#E53935",
             label="Validation Loss",
+            zorder=3,
         )
 
-    plt.title(
-        f"Training vs Validation Loss - {model_type.upper()} ({trained_epochs} epoch)",
-        fontsize=14,
+    # --- Titik best train loss ---
+    best_epoch = train_loss.index(min(train_loss)) + 1
+    best_val   = min(train_loss)
+    ax.scatter(
+        [best_epoch], [best_val],
+        color="#FFB300", s=60, zorder=5,
+        label=f"Best Train Loss (epoch {best_epoch}: {best_val:.6f})",
     )
-    plt.xlabel("Epoch", fontsize=12)
-    plt.ylabel("MSE Loss", fontsize=12)
-    plt.xlim(1, trained_epochs)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+
+    # --- Garis vertikal early stopping ---
+    ax.axvline(
+        x=trained_epochs, color="gray", linestyle=":", linewidth=1.2,
+        label=f"Early stop (epoch {trained_epochs})",
+    )
+
+    ax.set_title(
+        f"Training vs Validation Loss — {model_type.upper()} ({trained_epochs} epoch)",
+        fontsize=14, fontweight="bold",
+    )
+    ax.set_xlabel("Epoch", fontsize=12)
+    ax.set_ylabel("MSE Loss", fontsize=12)
+    ax.set_xlim(1, trained_epochs)
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3)
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.close()

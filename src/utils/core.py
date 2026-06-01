@@ -95,8 +95,7 @@ def train_model(
         else:
             val_info = ""
 
-        if epoch == 1 or epoch % 100 == 0:
-            print(f"Epoch {epoch} - Train Loss: {avg_train_loss:.8f}{val_info}")
+        print(f"Epoch {epoch} - Train Loss: {avg_train_loss:.8f}{val_info}")
 
         # --- Early stopping berbasis train loss ---
         if avg_train_loss < best_loss - min_delta:
