@@ -9,6 +9,7 @@ def load_csv(path: str) -> list[dict]:
     ordinal = config["ordinal_encoding"]
     one_hot = config["one_hot_encoding"]
     numeric_special = config["numeric_special"]
+    one_hot_nominal = config.get("one_hot_nominal", {})
 
     with open(path, mode="r", encoding="utf-8-sig") as file:
         reader = csv.DictReader(file)
@@ -20,29 +21,32 @@ def load_csv(path: str) -> list[dict]:
                 cleaned_key = key.strip()
                 raw = value.strip() if value else ""
 
-                # Check ordinal encoding first
+                # Ordinal encoding (kategori dengan urutan bermakna)
                 if cleaned_key in ordinal:
                     mapping = ordinal[cleaned_key]
-                    if raw in mapping:
-                        cleaned_row[cleaned_key] = float(mapping[raw])
-                    else:
-                        cleaned_row[cleaned_key] = 0.0
+                    cleaned_row[cleaned_key] = float(mapping[raw]) if raw in mapping else 0.0
                     continue
 
+                # Binary encoding (e.g. Status_Subsidi_Listrik)
                 if cleaned_key in one_hot:
                     mapping = one_hot[cleaned_key]
-                    if raw in mapping:
-                        cleaned_row[cleaned_key] = float(mapping[raw])
-                    else:
-                        cleaned_row[cleaned_key] = 0.0
+                    cleaned_row[cleaned_key] = float(mapping[raw]) if raw in mapping else 0.0
                     continue
 
-                # Check numeric special cases (e.g. "Tidak tahu" in Daya_Listrik_Rumah_VA)
+                # One-hot nominal: kolom nominal di-expand menjadi N binary columns.
+                # Kolom asli tidak disimpan; baseline ("Tidak diisi") = semua nol.
+                if cleaned_key in one_hot_nominal:
+                    categories = one_hot_nominal[cleaned_key]
+                    for cat in categories:
+                        cleaned_row[f"{cleaned_key}__{cat}"] = 1.0 if raw == cat else 0.0
+                    continue
+
+                # Numeric special cases (e.g. "Tidak tahu" in Daya_Listrik_Rumah_VA)
                 if cleaned_key in numeric_special and raw in numeric_special[cleaned_key]:
                     cleaned_row[cleaned_key] = float(numeric_special[cleaned_key][raw])
                     continue
 
-                # Try parse as float
+                # Parse as float
                 if raw == "":
                     cleaned_row[cleaned_key] = 0.0
                 else:

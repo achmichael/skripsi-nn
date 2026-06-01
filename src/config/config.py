@@ -23,7 +23,7 @@ config = {
         "min_delta": 1e-5,
         "clip_value": 5.0,
         "target_label": "estimasi biaya (Rp)",
-        "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp"
+        "target": "Tagihan_Bulan_Terakhir_Rp"
     },
     "features": {
         "prabayar": [
@@ -73,17 +73,41 @@ config = {
 
             "Alat_Lain_Ada",
 
-            "Alat_Lain_1_Jenis",
+            # Alat_Lain_1_Jenis: one-hot nominal (tidak ada urutan antar jenis alat)
+            "Alat_Lain_1_Jenis__Charger HP/perangkat kecil",
+            "Alat_Lain_1_Jenis__Blender/Mixer",
+            "Alat_Lain_1_Jenis__Setrika",
+            "Alat_Lain_1_Jenis__Dispenser",
+            "Alat_Lain_1_Jenis__Komputer/Laptop",
+            "Alat_Lain_1_Jenis__Pompa air",
+            "Alat_Lain_1_Jenis__Oven/Microwave",
+            "Alat_Lain_1_Jenis__Lainnya",
             "Alat_Lain_1_Jumlah",
             "Alat_Lain_1_Kategori",
             "Alat_Lain_1_EstimasiWatt",
 
-            "Alat_Lain_2_Jenis",
+            # Alat_Lain_2_Jenis: one-hot nominal
+            "Alat_Lain_2_Jenis__Charger HP/perangkat kecil",
+            "Alat_Lain_2_Jenis__Blender/Mixer",
+            "Alat_Lain_2_Jenis__Setrika",
+            "Alat_Lain_2_Jenis__Dispenser",
+            "Alat_Lain_2_Jenis__Komputer/Laptop",
+            "Alat_Lain_2_Jenis__Pompa air",
+            "Alat_Lain_2_Jenis__Oven/Microwave",
+            "Alat_Lain_2_Jenis__Lainnya",
             "Alat_Lain_2_Jumlah",
             "Alat_Lain_2_Kategori",
             "Alat_Lain_2_EstimasiWatt",
 
-            "Alat_Lain_3_Jenis",
+            # Alat_Lain_3_Jenis: one-hot nominal
+            "Alat_Lain_3_Jenis__Charger HP/perangkat kecil",
+            "Alat_Lain_3_Jenis__Blender/Mixer",
+            "Alat_Lain_3_Jenis__Setrika",
+            "Alat_Lain_3_Jenis__Dispenser",
+            "Alat_Lain_3_Jenis__Komputer/Laptop",
+            "Alat_Lain_3_Jenis__Pompa air",
+            "Alat_Lain_3_Jenis__Oven/Microwave",
+            "Alat_Lain_3_Jenis__Lainnya",
             "Alat_Lain_3_Jumlah",
             "Alat_Lain_3_Kategori",
             "Alat_Lain_3_EstimasiWatt",
@@ -145,17 +169,41 @@ config = {
 
             "Alat_Lain_Ada",
 
-            "Alat_Lain_1_Jenis",
+            # Alat_Lain_1_Jenis: one-hot nominal
+            "Alat_Lain_1_Jenis__Charger HP/perangkat kecil",
+            "Alat_Lain_1_Jenis__Blender/Mixer",
+            "Alat_Lain_1_Jenis__Setrika",
+            "Alat_Lain_1_Jenis__Dispenser",
+            "Alat_Lain_1_Jenis__Komputer/Laptop",
+            "Alat_Lain_1_Jenis__Pompa air",
+            "Alat_Lain_1_Jenis__Oven/Microwave",
+            "Alat_Lain_1_Jenis__Lainnya",
             "Alat_Lain_1_Jumlah",
             "Alat_Lain_1_Kategori",
             "Alat_Lain_1_EstimasiWatt",
 
-            "Alat_Lain_2_Jenis",
+            # Alat_Lain_2_Jenis: one-hot nominal
+            "Alat_Lain_2_Jenis__Charger HP/perangkat kecil",
+            "Alat_Lain_2_Jenis__Blender/Mixer",
+            "Alat_Lain_2_Jenis__Setrika",
+            "Alat_Lain_2_Jenis__Dispenser",
+            "Alat_Lain_2_Jenis__Komputer/Laptop",
+            "Alat_Lain_2_Jenis__Pompa air",
+            "Alat_Lain_2_Jenis__Oven/Microwave",
+            "Alat_Lain_2_Jenis__Lainnya",
             "Alat_Lain_2_Jumlah",
             "Alat_Lain_2_Kategori",
             "Alat_Lain_2_EstimasiWatt",
 
-            "Alat_Lain_3_Jenis",
+            # Alat_Lain_3_Jenis: one-hot nominal
+            "Alat_Lain_3_Jenis__Charger HP/perangkat kecil",
+            "Alat_Lain_3_Jenis__Blender/Mixer",
+            "Alat_Lain_3_Jenis__Setrika",
+            "Alat_Lain_3_Jenis__Dispenser",
+            "Alat_Lain_3_Jenis__Komputer/Laptop",
+            "Alat_Lain_3_Jenis__Pompa air",
+            "Alat_Lain_3_Jenis__Oven/Microwave",
+            "Alat_Lain_3_Jenis__Lainnya",
             "Alat_Lain_3_Jumlah",
             "Alat_Lain_3_Kategori",
             "Alat_Lain_3_EstimasiWatt",
@@ -207,6 +255,16 @@ config = {
 
         "Total_Energi_Utama_kWhPerHari",
         "Total_Energi_Semua_kWhPerHari",
+
+        "Nominal_Token_Terakhir_Rp",
+        "Tagihan_Bulan_Terakhir_Rp",
+        "Pemakaian_Bulan_Terakhir_kWh",
+        "Tagihan_Rata_Rata_3Bulan_Rp",
+        "Pemakaian_Rata_Rata_3Bulan_kWh",
+        "Jumlah_Bulan_Tagihan_Terisi",
+        "Jumlah_Bulan_kWh_Terisi",
+        "Total_Energi_Semua_kWhPerBulan",
+        "Estimasi_Tarif_Per_kWh_Rp",
     ],
     # Ordinal encoding: maps categorical string -> numeric value
     # Ordered by intensity/size so NN can learn magnitude
@@ -278,39 +336,7 @@ config = {
             "Ya": 1,
         },
 
-        "Alat_Lain_1_Jenis": {
-            "Tidak diisi": 0,
-            "Charger HP/perangkat kecil": 1,
-            "Blender/Mixer": 2,
-            "Setrika": 3,
-            "Dispenser": 4,
-            "Komputer/Laptop": 5,
-            "Pompa air": 6,
-            "Oven/Microwave": 7,
-            "Lainnya": 8,
-        },
-        "Alat_Lain_2_Jenis": {
-            "Tidak diisi": 0,
-            "Charger HP/perangkat kecil": 1,
-            "Blender/Mixer": 2,
-            "Setrika": 3,
-            "Dispenser": 4,
-            "Komputer/Laptop": 5,
-            "Pompa air": 6,
-            "Oven/Microwave": 7,
-            "Lainnya": 8,
-        },
-        "Alat_Lain_3_Jenis": {
-            "Tidak diisi": 0,
-            "Charger HP/perangkat kecil": 1,
-            "Blender/Mixer": 2,
-            "Setrika": 3,
-            "Dispenser": 4,
-            "Komputer/Laptop": 5,
-            "Pompa air": 6,
-            "Oven/Microwave": 7,
-            "Lainnya": 8,
-        },
+        # Alat_Lain_X_Jenis dipindah ke one_hot_nominal (lihat di bawah)
 
         # Frequency categories for Alat_Lain
         "Alat_Lain_1_Kategori": {
@@ -372,5 +398,41 @@ config = {
             "Tidak tahu": 900,    
             "> 5500": 7700,       
         },
+    },
+
+    # Kategori nominal (tanpa urutan) — di-expand menjadi binary columns.
+    # Format kolom hasil: "<nama_kolom>__<nilai_kategori>" = 1.0 jika cocok, else 0.0.
+    # Kategori baseline ("Tidak diisi") tidak dibuat kolom tersendiri (semua nol = baseline).
+    "one_hot_nominal": {
+        "Alat_Lain_1_Jenis": [
+            "Charger HP/perangkat kecil",
+            "Blender/Mixer",
+            "Setrika",
+            "Dispenser",
+            "Komputer/Laptop",
+            "Pompa air",
+            "Oven/Microwave",
+            "Lainnya",
+        ],
+        "Alat_Lain_2_Jenis": [
+            "Charger HP/perangkat kecil",
+            "Blender/Mixer",
+            "Setrika",
+            "Dispenser",
+            "Komputer/Laptop",
+            "Pompa air",
+            "Oven/Microwave",
+            "Lainnya",
+        ],
+        "Alat_Lain_3_Jenis": [
+            "Charger HP/perangkat kecil",
+            "Blender/Mixer",
+            "Setrika",
+            "Dispenser",
+            "Komputer/Laptop",
+            "Pompa air",
+            "Oven/Microwave",
+            "Lainnya",
+        ],
     },
 }
