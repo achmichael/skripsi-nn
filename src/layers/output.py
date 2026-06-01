@@ -26,7 +26,7 @@ class OutputLayer:
     def backward(self, target: float, learning_rate: float) -> list[float]:
         prediction = self.last_output
 
-        d_loss_d_output = 2.0 * (prediction - target)
+        d_loss_d_output = 2.0 * (prediction - target) 
 
         hidden_gradients = [0.0 for _ in range(self.hidden_size)]
 
