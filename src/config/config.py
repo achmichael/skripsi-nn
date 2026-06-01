@@ -1,9 +1,37 @@
 config = {
-    "target": {
-        "prabayar": "Token_Habis_Dalam_Hari",
-        "pascabayar": "Estimasi_Biaya_Energi_Bulanan_Rp",
+    "prabayar": {
+        "dataset_path": "data/prabayar.csv",
+        "model_path": "results/prabayar/models/model_prabayar.json",
+        "metrics_dir": "results/prabayar/metrics",
+        "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
+        "hidden_layers": [64, 32],
+        "learning_rate": 0.001,
+        "patience": 5,
+        "min_delta": 1e-4,
+        "clip_value": 5.0,
+        "target_label": "durasi token (hari)",
+        "target": "Token_Habis_Dalam_Hari" 
     },
-
+    "pascabayar": {
+        "dataset_path": "data/pascabayar.csv",
+        "model_path": "results/pascabayar/models/model_pascabayar.json",
+        "metrics_dir": "results/pascabayar/metrics",
+        "layer_sizes": None,  # set dynamically: [input, 128, 64, 32, 1]
+        "hidden_layers": [224, 64, 32],
+        "learning_rate": 0.0005,
+        "patience": 5,
+        "min_delta": 1e-5,
+        "clip_value": 5.0,
+        "target_label": "estimasi biaya (Rp)",
+        "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp"
+    },
+    "drop_columns": [
+        "Timestamp",
+        "Nama/Inisial",
+        "Kota/Kabupaten"
+        "Bulan_Tagihan"
+        "Sumber_Angka_Tagihan"
+    ],
     "features": {
         "prabayar": [
             "Jumlah_Anggota_Keluarga",
@@ -94,7 +122,7 @@ config = {
 
             "TV_Jumlah",
             "TV_Kategori",
-            "TV_EstimasiWattPerUnit",
+            # TV_EstimasiWattPerUnit removed: constant 80 across all rows
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
 
@@ -107,21 +135,21 @@ config = {
 
             "Kipas_Jumlah",
             "Kipas_Kategori",
-            "Kipas_EstimasiWattPerUnit",
+            # Kipas_EstimasiWattPerUnit removed: constant 45 across all rows
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
 
             "RiceCooker_Jumlah",
             "RiceCooker_Kategori",
-            "RiceCooker_EstimasiWattPerUnit",
+            # RiceCooker_EstimasiWattPerUnit removed: constant 300 across all rows
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
 
             "MesinCuci_Jumlah",
             "MesinCuci_Kategori",
-            "MesinCuci_EstimasiWattPerUnit",
+            # MesinCuci_EstimasiWattPerUnit removed: constant 350 across all rows
             "MesinCuci_EstimasiFrekuensiPerMinggu",
-            "MesinCuci_EstimasiDurasiSekaliPakaiJam",
+            # MesinCuci_EstimasiDurasiSekaliPakaiJam removed: constant 1.5 across all rows
             "MesinCuci_Energi_kWhPerHari",
 
             "Alat_Lain_Ada",
@@ -144,17 +172,60 @@ config = {
             "Total_Energi_Alat_Lain_kWhPerHari",
             "Total_Energi_Utama_kWhPerHari",
             "Total_Energi_Semua_kWhPerHari",
+
+            # Derived features (computed from existing data, not external info)
+            "Total_Energi_Semua_kWhPerBulan",
+            "Estimasi_Tarif_Per_kWh_Rp",
         ],
     },
 
+    "numeric_cols": [
+        "Jumlah_Anggota_Keluarga"
+        "Daya_Listrik_Rumah_VA"
+
+        "Kulkas_Jumlah"
+        "Kulkas_EstimasiWattPerUnit"
+        "Kulkas_EstimasiJamPerHari"
+        "Kulkas_Energi_kWhPerHari"
+
+        "TV_Jumlah"
+        "TV_EstimasiWattPerUnit"
+        "TV_EstimasiJamPerHari"
+        "TV_Energi_kWhPerHari"
+
+        "AC_Jumlah"
+        "AC_EstimasiWattPerUnit"
+        "AC_EstimasiJamPerHari"
+        "AC_Energi_kWhPerHari"
+
+        "Kipas_Jumlah"
+        "Kipas_EstimasiWattPerUnit"
+        "Kipas_EstimasiJamPerHari"
+        "Kipas_Energi_kWhPerHari"
+
+        "RiceCooker_Jumlah"
+        "RiceCooker_EstimasiWattPerUnit"
+        "RiceCooker_EstimasiJamPerHari"
+        "RiceCooker_Energi_kWhPerHari"
+
+        "MesinCuci_Jumlah"
+        "MesinCuci_EstimasiWattPerUnit"
+        "MesinCuci_EstimasiFrekuensiPerMinggu"
+        "MesinCuci_EstimasiDurasiSekaliPakaiJam"
+        "MesinCuci_Energi_kWhPerHari"
+
+        "Total_Energi_Utama_kWhPerHari"
+        "Total_Energi_Semua_kWhPerHari"
+    ],
     # Ordinal encoding: maps categorical string -> numeric value
     # Ordered by intensity/size so NN can learn magnitude
-    "ordinal_encoding": {
+    "one_hot_encoding": {
         "Status_Subsidi_Listrik": {
             "Subsidi": 0,
             "Non Subsidi": 1,
         },
-
+    },
+    "ordinal_encoding": {
         "Kulkas_Kategori": {
             "Tidak ada": 0,
             "Tidak tahu": 1,
@@ -307,8 +378,8 @@ config = {
     # Special numeric values for text in otherwise-numeric columns
     "numeric_special": {
         "Daya_Listrik_Rumah_VA": {
-            "Tidak tahu": 900,    # default to smallest common VA
-            "> 5500": 7700,       # next common tier above 5500
+            "Tidak tahu": 900,    
+            "> 5500": 7700,       
         },
     },
 }
