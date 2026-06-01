@@ -17,21 +17,14 @@ config = {
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 128, 64, 32, 1]
-        "hidden_layers": [224, 64, 32],
-        "learning_rate": 0.0005,
+        "hidden_layers": [64, 32],
+        "learning_rate": 0.001,
         "patience": 5,
         "min_delta": 1e-5,
         "clip_value": 5.0,
         "target_label": "estimasi biaya (Rp)",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp"
     },
-    "drop_columns": [
-        "Timestamp",
-        "Nama/Inisial",
-        "Kota/Kabupaten"
-        "Bulan_Tagihan"
-        "Sumber_Angka_Tagihan"
-    ],
     "features": {
         "prabayar": [
             "Jumlah_Anggota_Keluarga",
@@ -110,8 +103,6 @@ config = {
             "Pemakaian_Rata_Rata_3Bulan_kWh",
             "Jumlah_Bulan_Tagihan_Terisi",
             "Jumlah_Bulan_kWh_Terisi",
-            "Bulan_Tagihan",
-            "Sumber_Angka_Tagihan",
             "Tagihan_Relatif_Stabil",
 
             "Kulkas_Jumlah",
@@ -180,42 +171,42 @@ config = {
     },
 
     "numeric_cols": [
-        "Jumlah_Anggota_Keluarga"
-        "Daya_Listrik_Rumah_VA"
+        "Jumlah_Anggota_Keluarga",
+        "Daya_Listrik_Rumah_VA",
 
-        "Kulkas_Jumlah"
-        "Kulkas_EstimasiWattPerUnit"
-        "Kulkas_EstimasiJamPerHari"
-        "Kulkas_Energi_kWhPerHari"
+        "Kulkas_Jumlah",
+        "Kulkas_EstimasiWattPerUnit",
+        "Kulkas_EstimasiJamPerHari",
+        "Kulkas_Energi_kWhPerHari",
 
-        "TV_Jumlah"
-        "TV_EstimasiWattPerUnit"
-        "TV_EstimasiJamPerHari"
-        "TV_Energi_kWhPerHari"
+        "TV_Jumlah",
+        "TV_EstimasiWattPerUnit",
+        "TV_EstimasiJamPerHari",
+        "TV_Energi_kWhPerHari",
 
-        "AC_Jumlah"
-        "AC_EstimasiWattPerUnit"
-        "AC_EstimasiJamPerHari"
-        "AC_Energi_kWhPerHari"
+        "AC_Jumlah",
+        "AC_EstimasiWattPerUnit",
+        "AC_EstimasiJamPerHari",
+        "AC_Energi_kWhPerHari",
 
-        "Kipas_Jumlah"
-        "Kipas_EstimasiWattPerUnit"
-        "Kipas_EstimasiJamPerHari"
-        "Kipas_Energi_kWhPerHari"
+        "Kipas_Jumlah",
+        "Kipas_EstimasiWattPerUnit",
+        "Kipas_EstimasiJamPerHari",
+        "Kipas_Energi_kWhPerHari",
 
-        "RiceCooker_Jumlah"
-        "RiceCooker_EstimasiWattPerUnit"
-        "RiceCooker_EstimasiJamPerHari"
-        "RiceCooker_Energi_kWhPerHari"
+        "RiceCooker_Jumlah",
+        "RiceCooker_EstimasiWattPerUnit",
+        "RiceCooker_EstimasiJamPerHari",
+        "RiceCooker_Energi_kWhPerHari",
 
-        "MesinCuci_Jumlah"
-        "MesinCuci_EstimasiWattPerUnit"
-        "MesinCuci_EstimasiFrekuensiPerMinggu"
-        "MesinCuci_EstimasiDurasiSekaliPakaiJam"
-        "MesinCuci_Energi_kWhPerHari"
+        "MesinCuci_Jumlah",
+        "MesinCuci_EstimasiWattPerUnit",
+        "MesinCuci_EstimasiFrekuensiPerMinggu",
+        "MesinCuci_EstimasiDurasiSekaliPakaiJam",
+        "MesinCuci_Energi_kWhPerHari",
 
-        "Total_Energi_Utama_kWhPerHari"
-        "Total_Energi_Semua_kWhPerHari"
+        "Total_Energi_Utama_kWhPerHari",
+        "Total_Energi_Semua_kWhPerHari",
     ],
     # Ordinal encoding: maps categorical string -> numeric value
     # Ordered by intensity/size so NN can learn magnitude

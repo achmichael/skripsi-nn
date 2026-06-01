@@ -5,6 +5,8 @@ import sys
 
 # pyrefly: ignore [missing-import]
 import matplotlib.pyplot as plt
+# pyrefly: ignore [missing-import]
+import matplotlib.ticker as mticker
 
 from src.pipeline.preprocessing import (
     load_csv,
@@ -69,17 +71,86 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
     print(f"Loss curve disimpan ke: {save_path} (epoch aktual: {trained_epochs})")
     
 def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: str, label: str):
-    """Plot scatter prediksi vs aktual."""
-    plt.figure(figsize=(8, 8))
-    plt.scatter(y_actual, y_predicted, alpha=0.5, s=20, color="#4CAF50")
-    min_val = min(min(y_actual), min(y_predicted))
-    max_val = max(max(y_actual), max(y_predicted))
-    plt.plot([min_val, max_val], [min_val, max_val], "r--", linewidth=1.5, label="Ideal")
-    plt.title(f"Prediksi vs Aktual - {model_type.upper()}", fontsize=14)
-    plt.xlabel(f"Aktual ({label})", fontsize=12)
-    plt.ylabel(f"Prediksi ({label})", fontsize=12)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    """Plot scatter prediksi vs aktual dengan satuan juta Rp, zona toleransi, dan statistik."""
+    # Konversi ke juta Rp agar sumbu mudah dibaca
+    scale = 1_000_000
+    actual_m  = [v / scale for v in y_actual]
+    pred_m    = [v / scale for v in y_predicted]
+
+    # Hitung R²
+    mean_actual = sum(actual_m) / len(actual_m)
+    ss_tot = sum((a - mean_actual) ** 2 for a in actual_m)
+    ss_res = sum((a - p) ** 2 for a, p in zip(actual_m, pred_m))
+    r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
+
+    # Hitung persen prediksi dalam toleransi ±20%
+    within_20pct = sum(
+        1 for a, p in zip(actual_m, pred_m)
+        if a != 0 and abs(p - a) / abs(a) <= 0.20
+    )
+    pct_within = within_20pct / len(actual_m) * 100
+
+    all_vals = actual_m + pred_m
+    min_val  = min(all_vals)
+    max_val  = max(all_vals)
+    margin   = (max_val - min_val) * 0.05
+    lo = min_val - margin
+    hi = max_val + margin
+
+    fig, ax = plt.subplots(figsize=(9, 8))
+
+    # Zona toleransi ±20%
+    ref = [lo, hi]
+    ax.fill_between(
+        ref,
+        [v * 0.80 for v in ref],
+        [v * 1.20 for v in ref],
+        alpha=0.12,
+        color="#2196F3",
+        label="Toleransi ±20%",
+    )
+
+    # Scatter points — warna berdasarkan masuk/keluar toleransi
+    colors = [
+        "#4CAF50" if abs(a) > 0 and abs(p - a) / abs(a) <= 0.20 else "#F44336"
+        for a, p in zip(actual_m, pred_m)
+    ]
+    ax.scatter(actual_m, pred_m, c=colors, alpha=0.75, s=35, zorder=3)
+
+    # Garis ideal y = x
+    ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5, label="Ideal (y = x)", zorder=4)
+
+    # Dummy scatter untuk legend
+    ax.scatter([], [], c="#4CAF50", s=35, label=f"Dalam toleransi ({within_20pct}/{len(actual_m)} titik)")
+    ax.scatter([], [], c="#F44336", s=35, label="Di luar toleransi")
+
+    # Format sumbu dengan satuan jt Rp
+    def fmt_juta(x, _):
+        return f"{x:,.0f} jt"
+
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(fmt_juta))
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_juta))
+    ax.tick_params(axis='x', rotation=30)
+
+    ax.set_xlim(lo, hi)
+    ax.set_ylim(lo, hi)
+    ax.set_xlabel(f"Aktual ({label}) — juta Rp", fontsize=12)
+    ax.set_ylabel(f"Prediksi ({label}) — juta Rp", fontsize=12)
+    ax.set_title(f"Prediksi vs Aktual — {model_type.upper()}", fontsize=14, fontweight="bold")
+    ax.legend(fontsize=9, loc="upper left")
+    ax.grid(True, alpha=0.3)
+
+    # Kotak statistik
+    stats_text = f"R² = {r2:.4f}\nDalam ±20%: {pct_within:.1f}%"
+    ax.text(
+        0.98, 0.05, stats_text,
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment="bottom",
+        horizontalalignment="right",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.8, edgecolor="gray"),
+    )
+
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.close()
@@ -87,14 +158,75 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
 
 
 def save_error_distribution(errors, save_path: str, model_type: str):
-    """Plot distribusi error."""
-    plt.figure(figsize=(10, 6))
-    plt.hist(errors, bins=30, color="#FF9800", edgecolor="black", alpha=0.7)
-    plt.title(f"Distribusi Error - {model_type.upper()}", fontsize=14)
-    plt.xlabel("Error (Prediksi - Aktual)", fontsize=12)
-    plt.ylabel("Frekuensi", fontsize=12)
-    plt.axvline(x=0, color="red", linestyle="--", linewidth=1.5)
-    plt.grid(True, alpha=0.3)
+    """Plot distribusi error dalam juta Rp dengan statistik ringkas dan zona under/overprediction."""
+    scale = 1_000_000
+    errors_m = [e / scale for e in errors]
+
+    n = len(errors_m)
+    mean_e  = sum(errors_m) / n
+    sorted_e = sorted(errors_m)
+    mid = n // 2
+    median_e = (sorted_e[mid - 1] + sorted_e[mid]) / 2 if n % 2 == 0 else sorted_e[mid]
+    variance = sum((e - mean_e) ** 2 for e in errors_m) / n
+    std_e = variance ** 0.5
+
+    n_over  = sum(1 for e in errors_m if e > 0)   # prediksi lebih tinggi
+    n_under = sum(1 for e in errors_m if e < 0)   # prediksi lebih rendah
+    n_exact = n - n_over - n_under
+
+    fig, ax = plt.subplots(figsize=(11, 6))
+
+    # Zona warna background: merah=underprediction, hijau=overprediction
+    x_min = min(errors_m)
+    x_max = max(errors_m)
+    ax.axvspan(x_min, 0, alpha=0.06, color="#F44336", label="_nolegend_")
+    ax.axvspan(0, x_max, alpha=0.06, color="#4CAF50", label="_nolegend_")
+
+    # Histogram
+    ax.hist(errors_m, bins=25, color="#5C6BC0", edgecolor="white", linewidth=0.6, alpha=0.85, zorder=3)
+
+    # Garis referensi
+    ax.axvline(x=0,      color="#212121", linestyle="-",  linewidth=2.0, label="Zero error",       zorder=4)
+    ax.axvline(x=mean_e, color="#FF5722", linestyle="--", linewidth=1.8, label=f"Mean = {mean_e:+,.1f} jt",   zorder=4)
+    ax.axvline(x=median_e, color="#FFC107", linestyle=":", linewidth=1.8, label=f"Median = {median_e:+,.1f} jt", zorder=4)
+
+    # Label zona di atas grafik
+    ax.text(0.02, 0.97, f"Underprediksi\n({n_under} titik, {n_under/n*100:.1f}%)",
+            transform=ax.transAxes, fontsize=9, va="top", ha="left",
+            color="#C62828", fontweight="bold")
+    ax.text(0.98, 0.97, f"Overprediksi\n({n_over} titik, {n_over/n*100:.1f}%)",
+            transform=ax.transAxes, fontsize=9, va="top", ha="right",
+            color="#2E7D32", fontweight="bold")
+
+    # Format sumbu X
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:+,.0f} jt"))
+    ax.tick_params(axis='x', rotation=20)
+
+    ax.set_xlabel("Error = Prediksi − Aktual (juta Rp)", fontsize=12)
+    ax.set_ylabel("Frekuensi", fontsize=12)
+    ax.set_title(
+        f"Distribusi Error Prediksi — {model_type.upper()}",
+        fontsize=14, fontweight="bold"
+    )
+    ax.legend(fontsize=9)
+    ax.grid(True, alpha=0.3, axis="y")
+
+    # Kotak statistik
+    stats_text = (
+        f"n = {n} data\n"
+        f"Std Dev = {std_e:,.1f} jt\n"
+        f"Min = {min(errors_m):+,.1f} jt\n"
+        f"Max = {max(errors_m):+,.1f} jt"
+    )
+    ax.text(
+        0.98, 0.60, stats_text,
+        transform=ax.transAxes,
+        fontsize=9,
+        verticalalignment="top",
+        horizontalalignment="right",
+        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.85, edgecolor="gray"),
+    )
+
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.close()
@@ -179,8 +311,11 @@ def run_training(model_type: str):
         patience=cfg["patience"],
         min_delta=cfg["min_delta"],
         epochs=None,
+        x_val=x_test_scaled,
+        y_val=y_test_scaled,
     )
-    print(f"Training selesai. Total epoch aktual: {len(history)}")
+    total_epochs = len(history["train_loss"])
+    print(f"Training selesai. Total epoch aktual: {total_epochs}")
 
     # Evaluate
     evaluation = evaluate_model(
@@ -254,13 +389,17 @@ def run_training(model_type: str):
     )
 
     # 4. Metrics JSON
+    train_loss_list = history["train_loss"]
+    val_loss_list = history["val_loss"]
     metrics_data = {
         "model_type": model_type,
         "arsitektur": layer_sizes,
         "learning_rate": cfg["learning_rate"],
-        "total_epochs": len(history),
-        "final_loss": history[-1],
-        "best_loss": min(history),
+        "total_epochs": total_epochs,
+        "final_train_loss": train_loss_list[-1],
+        "best_train_loss": min(train_loss_list),
+        "final_val_loss": val_loss_list[-1] if val_loss_list else None,
+        "best_val_loss": min(val_loss_list) if val_loss_list else None,
         "evaluasi_normalisasi": {
             "mse": evaluation["mse"],
             "mae": evaluation["mae"],

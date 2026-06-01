@@ -36,16 +36,36 @@ def train_model(
     patience: int = 5,
     min_delta: float = 1e-4,
     epochs: int | None = None,
-) -> list[float]:
+    x_val: list[list[float]] | None = None,
+    y_val: list[float] | None = None,
+) -> dict:
     """
-    Train with early stopping.
-    - epochs=None: unlimited, stop by patience only.
-    - min_delta: minimum loss improvement to count as progress.
+    Train dengan early stopping dan opsional validation loss per epoch.
+
+    Args:
+        model        : Instance NeuralNetwork yang akan dilatih.
+        x_train      : Fitur data training (sudah dinormalisasi).
+        y_train      : Target data training (sudah dinormalisasi).
+        learning_rate: Laju pembelajaran.
+        patience     : Jumlah epoch tanpa perbaikan sebelum early stopping.
+        min_delta    : Minimum penurunan loss yang dianggap sebagai perbaikan.
+        epochs       : Batas maksimum epoch (None = tidak terbatas).
+        x_val        : Fitur data validasi opsional (sudah dinormalisasi).
+        y_val        : Target data validasi opsional (sudah dinormalisasi).
+
+    Returns:
+        Dict berisi:
+          - "train_loss": list train loss per epoch
+          - "val_loss"  : list val loss per epoch (kosong jika x_val tidak diberikan)
     """
-    history = []
+    train_loss_history: list[float] = []
+    val_loss_history: list[float] = []
+
     best_loss = float("inf")
     epochs_without_improvement = 0
     epoch = 0
+
+    has_val = x_val is not None and y_val is not None
 
     while True:
         epoch += 1
@@ -54,20 +74,33 @@ def train_model(
             print(f"Mencapai batas maksimum {epochs} epoch.")
             break
 
-        total_loss = 0.0
-
+        # --- Training pass (update bobot) ---
+        total_train_loss = 0.0
         for inputs, target in zip(x_train, y_train):
             loss = model.train_one_sample(inputs, target, learning_rate)
-            total_loss += loss
+            total_train_loss += loss
 
-        average_loss = total_loss / len(x_train)
-        history.append(average_loss)
+        avg_train_loss = total_train_loss / len(x_train)
+        train_loss_history.append(avg_train_loss)
+
+        # --- Validation pass (inferensi saja, tanpa update bobot) ---
+        if has_val:
+            total_val_loss = 0.0
+            for inputs, target in zip(x_val, y_val):  # type: ignore[arg-type]
+                pred = model.predict(inputs)
+                total_val_loss += mean_squared_error_single(pred, target)
+            avg_val_loss = total_val_loss / len(y_val)  # type: ignore[arg-type]
+            val_loss_history.append(avg_val_loss)
+            val_info = f" | Val Loss: {avg_val_loss:.8f}"
+        else:
+            val_info = ""
 
         if epoch == 1 or epoch % 100 == 0:
-            print(f"Epoch {epoch} - Loss: {average_loss:.8f}")
+            print(f"Epoch {epoch} - Train Loss: {avg_train_loss:.8f}{val_info}")
 
-        if average_loss < best_loss - min_delta:
-            best_loss = average_loss
+        # --- Early stopping berbasis train loss ---
+        if avg_train_loss < best_loss - min_delta:
+            best_loss = avg_train_loss
             epochs_without_improvement = 0
         else:
             epochs_without_improvement += 1
@@ -80,7 +113,10 @@ def train_model(
             )
             break
 
-    return history
+    return {
+        "train_loss": train_loss_history,
+        "val_loss": val_loss_history,
+    }
 
 
 def evaluate_model(
