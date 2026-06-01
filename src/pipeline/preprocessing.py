@@ -7,6 +7,7 @@ def load_csv(path: str) -> list[dict]:
     """Load CSV and encode categorical columns to numeric using config mappings."""
     rows = []
     ordinal = config["ordinal_encoding"]
+    one_hot = config["one_hot_encoding"]
     numeric_special = config["numeric_special"]
 
     with open(path, mode="r", encoding="utf-8-sig") as file:
@@ -22,6 +23,14 @@ def load_csv(path: str) -> list[dict]:
                 # Check ordinal encoding first
                 if cleaned_key in ordinal:
                     mapping = ordinal[cleaned_key]
+                    if raw in mapping:
+                        cleaned_row[cleaned_key] = float(mapping[raw])
+                    else:
+                        cleaned_row[cleaned_key] = 0.0
+                    continue
+
+                if cleaned_key in one_hot:
+                    mapping = one_hot[cleaned_key]
                     if raw in mapping:
                         cleaned_row[cleaned_key] = float(mapping[raw])
                     else:
