@@ -16,7 +16,7 @@ def extract_features_and_target(
         raise ValueError(f"Model type '{model_type}' tidak dikenal. Gunakan 'prabayar' atau 'pascabayar'.")
 
     feature_columns = config["features"][model_type]
-    target_column = config["target"][model_type]
+    target_column = config[model_type]["target"]
 
     # Validate columns exist
     available_columns = set(rows[0].keys())
