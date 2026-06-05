@@ -74,9 +74,13 @@ def train_model(
             print(f"Mencapai batas maksimum {epochs} epoch.")
             break
 
+        # --- Shuffle training data setiap epoch (P4) ---
+        combined_train = list(zip(x_train, y_train))
+        random.shuffle(combined_train)
+
         # --- Training pass (update bobot) ---
         total_train_loss = 0.0
-        for inputs, target in zip(x_train, y_train):
+        for inputs, target in combined_train:
             loss = model.train_one_sample(inputs, target, learning_rate)
             total_train_loss += loss
 
@@ -97,17 +101,19 @@ def train_model(
 
         print(f"Epoch {epoch} - Train Loss: {avg_train_loss:.8f}{val_info}")
 
-        # --- Early stopping berbasis train loss ---
-        if avg_train_loss < best_loss - min_delta:
-            best_loss = avg_train_loss
+        # --- Early stopping berbasis val loss (jika ada), fallback ke train loss (P6) ---
+        monitor_loss = avg_val_loss if has_val else avg_train_loss
+        if monitor_loss < best_loss - min_delta:
+            best_loss = monitor_loss
             epochs_without_improvement = 0
         else:
             epochs_without_improvement += 1
 
         if epochs_without_improvement >= patience:
+            monitor_name = "val" if has_val else "train"
             print(
                 f"Early stopping di epoch {epoch}. "
-                f"Tidak ada perbaikan selama {patience} epoch terakhir. "
+                f"Tidak ada perbaikan {monitor_name} loss selama {patience} epoch terakhir. "
                 f"Loss terbaik: {best_loss:.8f}"
             )
             break

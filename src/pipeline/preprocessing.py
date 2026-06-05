@@ -1,4 +1,5 @@
 import csv
+import math
 import random
 from src.config.config import config
 
@@ -126,27 +127,44 @@ def transform_minmax(x_data: list[list[float]], scaler: dict) -> list[list[float
     return scaled_data
 
 
-def fit_target_scaler(y_data: list[float]) -> dict:
+def fit_target_scaler(y_data: list[float], use_log: bool = False) -> dict:
+    """Fit MinMax scaler on target values, optionally with log-transform."""
+    if use_log:
+        y_transformed = [math.log(y) for y in y_data]
+    else:
+        y_transformed = y_data
+
     return {
-        "min": min(y_data),
-        "max": max(y_data),
+        "min": min(y_transformed),
+        "max": max(y_transformed),
+        "use_log": use_log,
     }
 
 
 def transform_target(y_data: list[float], scaler: dict) -> list[float]:
+    """Transform target values using fitted scaler (with optional log-transform)."""
+    use_log = scaler.get("use_log", False)
     min_value = scaler["min"]
     max_value = scaler["max"]
 
     scaled = []
 
     for value in y_data:
+        v = math.log(value) if use_log else value
+
         if max_value == min_value:
             scaled.append(0.0)
         else:
-            scaled.append((value - min_value) / (max_value - min_value))
+            scaled.append((v - min_value) / (max_value - min_value))
 
     return scaled
 
 
 def inverse_transform_target(value: float, scaler: dict) -> float:
-    return value * (scaler["max"] - scaler["min"]) + scaler["min"]
+    """Inverse transform: normalized [0,1] → original scale (with optional exp)."""
+    raw = value * (scaler["max"] - scaler["min"]) + scaler["min"]
+
+    if scaler.get("use_log", False):
+        return math.exp(raw)
+
+    return raw

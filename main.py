@@ -301,7 +301,7 @@ def run_training(model_type: str):
     x_train_scaled = transform_minmax(x_train, x_scaler)
     x_test_scaled = transform_minmax(x_test, x_scaler)
 
-    y_scaler = fit_target_scaler(y_train)
+    y_scaler = fit_target_scaler(y_train, use_log=cfg.get("use_log_transform", False))
     y_train_scaled = transform_target(y_train, y_scaler)
     y_test_scaled = transform_target(y_test, y_scaler)
 
@@ -315,6 +315,7 @@ def run_training(model_type: str):
             layer_sizes=layer_sizes,
             seed=42,
             clip_value=cfg["clip_value"],
+            l2_lambda=cfg.get("l2_lambda", 0.0),
         )
     else:
         model = PrabayarModel(

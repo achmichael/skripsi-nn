@@ -16,14 +16,17 @@ config = {
         "dataset_path": "data/pascabayar.csv",
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
-        "layer_sizes": None,  # set dynamically: [input, 128, 64, 32, 1]
-        "hidden_layers": [64, 32],
+        "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
+        "hidden_layers": [64, 32, 8],
         "learning_rate": 0.001,
+
         "patience": 5,
-        "min_delta": 1e-5,
+        "min_delta": 1e-4,
         "clip_value": 5.0,
+        "l2_lambda": 1e-3,
         "target_label": "estimasi biaya (Rp)",
-        "target": "Tagihan_Bulan_Terakhir_Rp"
+        "target": "Tagihan_Bulan_Terakhir_Rp",
+        "use_log_transform": True,
     },
     "features": {
         "prabayar": [
@@ -121,55 +124,52 @@ config = {
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
             "Status_Subsidi_Listrik",
-            "Tagihan_Bulan_Terakhir_Rp",
-            "Pemakaian_Bulan_Terakhir_kWh",
-            "Tagihan_Rata_Rata_3Bulan_Rp",
-            "Pemakaian_Rata_Rata_3Bulan_kWh",
+            
+            # --- LEAKAGE DROPPED ---
+            # "Pemakaian_Bulan_Terakhir_kWh" dihapus karena membocorkan target secara langsung
+            # "Pemakaian_Rata_Rata_3Bulan_kWh" dihapus karena korelasinya terlalu tinggi (0.77) dengan target
+            
             "Jumlah_Bulan_Tagihan_Terisi",
-            "Jumlah_Bulan_kWh_Terisi",
+            # "Jumlah_Bulan_kWh_Terisi" dihapus (Korelasi 1.0 dengan Jumlah_Bulan_Tagihan_Terisi)
+            
             "Tagihan_Relatif_Stabil",
 
             "Kulkas_Jumlah",
-            "Kulkas_Kategori",
+            # "Kulkas_Kategori" dihapus (Korelasi >0.92 dengan Kulkas_EstimasiWattPerUnit)
             "Kulkas_EstimasiWattPerUnit",
             "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
 
             "TV_Jumlah",
-            "TV_Kategori",
-            # TV_EstimasiWattPerUnit removed: constant 80 across all rows
+            # "TV_Kategori" dihapus (Korelasi >0.97 dengan TV_EstimasiJamPerHari)
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
 
             "AC_Jumlah",
-            "AC_PK_Kategori",
-            "AC_Kategori",
+            # "AC_PK_Kategori" dihapus (Korelasi >0.93 dengan AC_EstimasiWattPerUnit)
+            # "AC_Kategori" dihapus (Korelasi >0.96 dengan AC_EstimasiJamPerHari)
             "AC_EstimasiWattPerUnit",
             "AC_EstimasiJamPerHari",
             "AC_Energi_kWhPerHari",
 
             "Kipas_Jumlah",
-            "Kipas_Kategori",
-            # Kipas_EstimasiWattPerUnit removed: constant 45 across all rows
+            # "Kipas_Kategori" dihapus (Korelasi >0.97 dengan Kipas_EstimasiJamPerHari)
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
 
             "RiceCooker_Jumlah",
-            "RiceCooker_Kategori",
-            # RiceCooker_EstimasiWattPerUnit removed: constant 300 across all rows
+            # "RiceCooker_Kategori" dihapus (Korelasi >0.97 dengan RiceCooker_EstimasiJamPerHari)
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
 
             "MesinCuci_Jumlah",
-            "MesinCuci_Kategori",
-            # MesinCuci_EstimasiWattPerUnit removed: constant 350 across all rows
+            # "MesinCuci_Kategori" dihapus (Korelasi >0.99 dengan MesinCuci_EstimasiFrekuensiPerMinggu)
             "MesinCuci_EstimasiFrekuensiPerMinggu",
-            # MesinCuci_EstimasiDurasiSekaliPakaiJam removed: constant 1.5 across all rows
             "MesinCuci_Energi_kWhPerHari",
 
             "Alat_Lain_Ada",
 
-            # Alat_Lain_1_Jenis: one-hot nominal
+            # Alat_Lain_1_Jenis: dipertahankan karena masih memiliki distribusi varians
             "Alat_Lain_1_Jenis__Charger HP/perangkat kecil",
             "Alat_Lain_1_Jenis__Blender/Mixer",
             "Alat_Lain_1_Jenis__Setrika",
@@ -182,7 +182,7 @@ config = {
             "Alat_Lain_1_Kategori",
             "Alat_Lain_1_EstimasiWatt",
 
-            # Alat_Lain_2_Jenis: one-hot nominal
+            # Alat_Lain_2_Jenis: dipertahankan
             "Alat_Lain_2_Jenis__Charger HP/perangkat kecil",
             "Alat_Lain_2_Jenis__Blender/Mixer",
             "Alat_Lain_2_Jenis__Setrika",
@@ -195,24 +195,14 @@ config = {
             "Alat_Lain_2_Kategori",
             "Alat_Lain_2_EstimasiWatt",
 
-            # Alat_Lain_3_Jenis: one-hot nominal
-            "Alat_Lain_3_Jenis__Charger HP/perangkat kecil",
-            "Alat_Lain_3_Jenis__Blender/Mixer",
-            "Alat_Lain_3_Jenis__Setrika",
-            "Alat_Lain_3_Jenis__Dispenser",
-            "Alat_Lain_3_Jenis__Komputer/Laptop",
-            "Alat_Lain_3_Jenis__Pompa air",
-            "Alat_Lain_3_Jenis__Oven/Microwave",
-            "Alat_Lain_3_Jenis__Lainnya",
-            "Alat_Lain_3_Jumlah",
-            "Alat_Lain_3_Kategori",
-            "Alat_Lain_3_EstimasiWatt",
+            # --- SPARSITY DROPPED ---
+            # Seluruh "Alat_Lain_3_..." dihapus karena korelasi sangat rendah (<0.05) dan 
+            # mayoritas datanya kosong (variance mendekati 0), yang hanya akan membuat noise pada model.
 
             "Total_Energi_Alat_Lain_kWhPerHari",
-            "Total_Energi_Utama_kWhPerHari",
+            # "Total_Energi_Utama_kWhPerHari" dihapus (Korelasi >0.99 dengan Total_Energi_Semua_kWhPerHari)
             "Total_Energi_Semua_kWhPerHari",
 
-            # Derived features (computed from existing data, not external info)
             "Total_Energi_Semua_kWhPerBulan",
             "Estimasi_Tarif_Per_kWh_Rp",
         ],

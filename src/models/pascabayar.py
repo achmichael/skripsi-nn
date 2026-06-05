@@ -12,6 +12,7 @@ class PascabayarModel(NeuralNetwork):
         layer_sizes: list[int],
         seed: int | None = None,
         clip_value: float = 5.0,
+        l2_lambda: float = 0.0,
     ):
         if len(layer_sizes) < 2:
             raise ValueError(
@@ -25,6 +26,7 @@ class PascabayarModel(NeuralNetwork):
 
         self.layer_sizes = layer_sizes
         self.clip_value = clip_value
+        self.l2_lambda = l2_lambda
         self.num_layers = len(layer_sizes)
 
         if seed is not None:
@@ -44,8 +46,10 @@ class PascabayarModel(NeuralNetwork):
             for j in range(fan_out):
                 neuron_weights = []
                 for i in range(fan_in):
+                    # this is for random initialization and prevent zero weights
                     u1 = random.random() or 1e-10
                     u2 = random.random()
+                    # this is for normal distribution (box muller transform)
                     z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
                     neuron_weights.append(z * std)
                 layer_weights.append(neuron_weights)
@@ -131,12 +135,16 @@ class PascabayarModel(NeuralNetwork):
 
             deltas[l] = delta_curr
 
-        # Update bobot dan bias
+        # Update bobot dan bias (dengan L2 weight decay)
         for l in range(self.num_layers - 1):
             inputs_l = self._activations[l]
             for j in range(self.layer_sizes[l + 1]):
                 for i in range(self.layer_sizes[l]):
-                    self.weights[l][j][i] -= learning_rate * deltas[l][j] * inputs_l[i]
+                    grad = deltas[l][j] * inputs_l[i]
+                    # L2 regularization: tambah weight decay
+                    if self.l2_lambda > 0:
+                        grad += self.l2_lambda * self.weights[l][j][i]
+                    self.weights[l][j][i] -= learning_rate * grad
                 self.biases[l][j] -= learning_rate * deltas[l][j]
 
     def train_one_sample(
