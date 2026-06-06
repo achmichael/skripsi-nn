@@ -93,26 +93,26 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
     print(f"Loss curve disimpan ke: {save_path} (epoch aktual: {trained_epochs})")
     
 def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: str, label: str):
-    """Plot scatter prediksi vs aktual dengan satuan juta Rp, zona toleransi, dan statistik."""
-    # Konversi ke juta Rp agar sumbu mudah dibaca
-    scale = 1_000_000
-    actual_m  = [v / scale for v in y_actual]
-    pred_m    = [v / scale for v in y_predicted]
+    """Plot scatter prediksi vs aktual dengan satuan ribu Rp, zona toleransi, dan statistik."""
+    # Konversi ke ribu Rp agar label sumbu terbaca jelas
+    scale = 1_000
+    actual_k  = [v / scale for v in y_actual]
+    pred_k    = [v / scale for v in y_predicted]
 
     # Hitung R²
-    mean_actual = sum(actual_m) / len(actual_m)
-    ss_tot = sum((a - mean_actual) ** 2 for a in actual_m)
-    ss_res = sum((a - p) ** 2 for a, p in zip(actual_m, pred_m))
+    mean_actual = sum(actual_k) / len(actual_k)
+    ss_tot = sum((a - mean_actual) ** 2 for a in actual_k)
+    ss_res = sum((a - p) ** 2 for a, p in zip(actual_k, pred_k))
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
 
     # Hitung persen prediksi dalam toleransi ±20%
     within_20pct = sum(
-        1 for a, p in zip(actual_m, pred_m)
+        1 for a, p in zip(actual_k, pred_k)
         if a != 0 and abs(p - a) / abs(a) <= 0.20
     )
-    pct_within = within_20pct / len(actual_m) * 100
+    pct_within = within_20pct / len(actual_k) * 100
 
-    all_vals = actual_m + pred_m
+    all_vals = actual_k + pred_k
     min_val  = min(all_vals)
     max_val  = max(all_vals)
     margin   = (max_val - min_val) * 0.05
@@ -135,29 +135,29 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
     # Scatter points — warna berdasarkan masuk/keluar toleransi
     colors = [
         "#4CAF50" if abs(a) > 0 and abs(p - a) / abs(a) <= 0.20 else "#F44336"
-        for a, p in zip(actual_m, pred_m)
+        for a, p in zip(actual_k, pred_k)
     ]
-    ax.scatter(actual_m, pred_m, c=colors, alpha=0.75, s=35, zorder=3)
+    ax.scatter(actual_k, pred_k, c=colors, alpha=0.75, s=35, zorder=3)
 
     # Garis ideal y = x
     ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5, label="Ideal (y = x)", zorder=4)
 
     # Dummy scatter untuk legend
-    ax.scatter([], [], c="#4CAF50", s=35, label=f"Dalam toleransi ({within_20pct}/{len(actual_m)} titik)")
+    ax.scatter([], [], c="#4CAF50", s=35, label=f"Dalam toleransi ({within_20pct}/{len(actual_k)} titik)")
     ax.scatter([], [], c="#F44336", s=35, label="Di luar toleransi")
 
-    # Format sumbu dengan satuan jt Rp
-    def fmt_juta(x, _):
-        return f"{x:,.0f} jt"
+    # Format sumbu dengan satuan ribu Rp — tampilkan angka bulat ribuan
+    def fmt_ribu(x, _):
+        return f"{x:,.0f} rb"
 
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(fmt_juta))
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_juta))
+    ax.xaxis.set_major_formatter(mticker.FuncFormatter(fmt_ribu))
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_ribu))
     ax.tick_params(axis='x', rotation=30)
 
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
-    ax.set_xlabel(f"Aktual ({label}) — juta Rp", fontsize=12)
-    ax.set_ylabel(f"Prediksi ({label}) — juta Rp", fontsize=12)
+    ax.set_xlabel(f"Aktual ({label}) — ribu Rp", fontsize=12)
+    ax.set_ylabel(f"Prediksi ({label}) — ribu Rp", fontsize=12)
     ax.set_title(f"Prediksi vs Aktual — {model_type.upper()}", fontsize=14, fontweight="bold")
     ax.legend(fontsize=9, loc="upper left")
     ax.grid(True, alpha=0.3)
@@ -375,7 +375,7 @@ def run_training(model_type: str):
 
     # Sample predictions
     print(f"\nContoh prediksi ({cfg['target_label']}):")
-    for i in range(min(5, len(x_test_scaled))):
+    for i in range(min(10, len(x_test_scaled))):
         pred = preds_orig[i]
         actual = y_test[i]
         ratio = pred / actual if actual != 0 else float('inf')

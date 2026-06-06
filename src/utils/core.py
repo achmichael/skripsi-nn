@@ -81,6 +81,7 @@ def train_model(
         # --- Training pass (update bobot) ---
         total_train_loss = 0.0
         for inputs, target in combined_train:
+            print("train", inputs, target)
             loss = model.train_one_sample(inputs, target, learning_rate)
             total_train_loss += loss
 
