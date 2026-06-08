@@ -185,6 +185,175 @@ class PrabayarModel(NeuralNetwork):
         self.backward(target, learning_rate)
         return loss
 
+    # ------------------------------------------------------------------
+    # Mini-Batch Gradient Descent
+    # ------------------------------------------------------------------
+
+    def _compute_deltas(self, target: float) -> list[list[float]]:
+        """
+        Hitung delta (error signal) untuk setiap neuron di setiap layer.
+        Dipanggil SETELAH forward() karena membutuhkan _activations dan
+        _pre_activations yang sudah terisi.
+
+        Rumus:
+          - Output layer (linear): delta = d(MSE)/d(output) = 2*(pred - target)
+          - Hidden layer (ReLU) : delta_i = (Σ_j w_ji * delta_j) * ReLU'(z_i)
+            (error mengalir mundur dari layer berikutnya melalui bobot)
+
+        Args:
+            target: Nilai target aktual untuk sampel ini.
+
+        Returns:
+            deltas: List of list, deltas[l][j] = delta untuk neuron j di layer l.
+        """
+        prediction = self._activations[-1][0]
+        output_grad = 2.0 * (prediction - target)
+
+        deltas: list[list[float]] = [None] * (self.num_layers - 1)  # type: ignore
+
+        # Output layer (aktivasi linear, jadi delta = output_grad langsung)
+        deltas[-1] = [self._clip_gradient(output_grad, self.clip_value)]
+
+        # Hidden layers: propagasi error dari kanan ke kiri
+        for l in range(self.num_layers - 3, -1, -1):
+            fan_out_next = self.layer_sizes[l + 2]
+            fan_out_curr = self.layer_sizes[l + 1]
+            delta_curr = []
+
+            for i in range(fan_out_curr):
+                grad = 0.0
+                for j in range(fan_out_next):
+                    grad += self.weights[l + 1][j][i] * deltas[l + 1][j]
+                grad *= relu_derivative(self._pre_activations[l][i])
+                delta_curr.append(self._clip_gradient(grad, self.clip_value))
+
+            deltas[l] = delta_curr
+
+        return deltas
+
+    def train_batch(
+        self,
+        x_batch: list[list[float]],
+        y_batch: list[float],
+        learning_rate: float,
+    ) -> float:
+        """
+        Melatih model dengan satu mini-batch data menggunakan
+        Mini-Batch Gradient Descent.
+
+        ═══════════════════════════════════════════════════════
+        PERBEDAAN UTAMA DENGAN train_one_sample / backward:
+        ═══════════════════════════════════════════════════════
+        Pada Pure SGD (train_one_sample + backward):
+          → Setiap 1 baris data langsung update bobot.
+          → Dengan data kuesioner yang noisy, bobot "terombang-ambing"
+            karena tiap sampel menarik bobot ke arah berbeda.
+          → Ini menyebabkan "regression to the mean".
+
+        Pada Mini-Batch GD (train_batch):
+          → Kita proses batch_size sampel dulu (misal 16 atau 32).
+          → Gradient dari setiap sampel DIAKUMULASI, bukan langsung
+            dipakai update.
+          → Setelah seluruh batch selesai, gradient DIRATA-RATAKAN
+            (dibagi batch_size), baru kemudian update bobot SEKALI.
+          → Rata-rata ini "meredam" noise dari sampel individual,
+            sehingga arah update bobot lebih stabil dan akurat.
+
+        ALGORITMA STEP-BY-STEP:
+        ───────────────────────
+        1. Buat akumulator gradient = 0 (bentuknya sama persis dengan
+           struktur weights dan biases model)
+
+        2. Untuk SETIAP sampel dalam batch:
+           a. Forward pass  → hitung prediksi
+           b. Compute deltas → hitung error signal (delta) per neuron
+           c. Hitung gradient:
+              - gradient bobot = delta_j × input_i
+              - gradient bias  = delta_j
+           d. TAMBAHKAN gradient ke akumulator (JANGAN update bobot!)
+
+        3. Setelah SEMUA sampel dalam batch selesai:
+           a. Bagi akumulator dengan batch_size → gradient rata-rata
+           b. Clip gradient rata-rata
+           c. Update bobot: w -= learning_rate × avg_grad
+           d. Update bias:  b -= learning_rate × avg_grad_bias
+
+        Args:
+            x_batch      : List of list, setiap elemen = 1 input sample.
+            y_batch      : List of float, target untuk setiap sampel.
+            learning_rate: Laju pembelajaran.
+
+        Returns:
+            Rata-rata MSE loss untuk batch ini.
+        """
+        batch_size = len(x_batch)
+
+        # =============================================================
+        # LANGKAH 1: Inisialisasi akumulator gradient ke nol
+        # =============================================================
+        # Strukturnya mengikuti self.weights dan self.biases:
+        #   acc_w[l][j][i] = akumulasi gradient untuk weights[l][j][i]
+        #   acc_b[l][j]    = akumulasi gradient untuk biases[l][j]
+        acc_w: list[list[list[float]]] = []
+        acc_b: list[list[float]] = []
+
+        for l in range(self.num_layers - 1):
+            layer_w = []
+            for j in range(self.layer_sizes[l + 1]):
+                layer_w.append([0.0] * self.layer_sizes[l])
+            acc_w.append(layer_w)
+            acc_b.append([0.0] * self.layer_sizes[l + 1])
+
+        total_loss = 0.0
+
+        # =============================================================
+        # LANGKAH 2: Loop setiap sampel → forward, delta, akumulasi
+        # =============================================================
+        for s in range(batch_size):
+            inputs = x_batch[s]
+            target = y_batch[s]
+
+            # 2a. Forward pass
+            prediction = self.forward(inputs)
+
+            # Catat loss untuk monitoring
+            total_loss += self._mse_loss(prediction, target)
+
+            # 2b. Hitung deltas (error signal per neuron)
+            deltas = self._compute_deltas(target)
+
+            # 2c-2d. Hitung gradient dan AKUMULASI
+            for l in range(self.num_layers - 1):
+                inputs_l = self._activations[l]
+
+                for j in range(self.layer_sizes[l + 1]):
+                    for i in range(self.layer_sizes[l]):
+                        acc_w[l][j][i] += deltas[l][j] * inputs_l[i]
+
+                    acc_b[l][j] += deltas[l][j]
+
+        # =============================================================
+        # LANGKAH 3: Rata-rata gradient, clip, lalu update bobot
+        # =============================================================
+        for l in range(self.num_layers - 1):
+            for j in range(self.layer_sizes[l + 1]):
+                for i in range(self.layer_sizes[l]):
+                    # 3a. Rata-ratakan gradient
+                    avg_grad = acc_w[l][j][i] / batch_size
+
+                    # 3b. Clip gradient
+                    avg_grad = self._clip_gradient(avg_grad, self.clip_value)
+
+                    # 3c. Update bobot (tanpa L2 untuk PrabayarModel)
+                    self.weights[l][j][i] -= learning_rate * avg_grad
+
+                # 3d. Update bias
+                avg_bias_grad = acc_b[l][j] / batch_size
+                avg_bias_grad = self._clip_gradient(avg_bias_grad, self.clip_value)
+                self.biases[l][j] -= learning_rate * avg_bias_grad
+
+        return total_loss / batch_size
+
     def predict(self, inputs: list[float]) -> float:
         """
         Inferensi tanpa memperbarui bobot.

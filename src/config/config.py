@@ -9,6 +9,7 @@ config = {
         "patience": 5,
         "min_delta": 1e-4,
         "clip_value": 5.0,
+        "batch_size": 16,
         "target_label": "durasi token (hari)",
         "target": "Token_Habis_Dalam_Hari" 
     },
@@ -17,15 +18,18 @@ config = {
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
-        "hidden_layers": [32, 16],
-        "learning_rate": 0.00005,
+        "hidden_layers": [128, 64, 32],
+        "learning_rate": 0.001,
 
-        "patience": 5,
-        "min_delta": 1e-4,
+        "patience": 30,
+        "min_delta": 1e-5,
         "clip_value": 5.0,
+        "batch_size": 16,
         "l2_lambda": 1e-4,
+        "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
-        "target": "Tagihan_Bulan_Terakhir_Rp",
+        # "target": "Tagihan_Bulan_Terakhir_Rp",
+        "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
         "use_log_transform": True,
     },
     "features": {
@@ -129,10 +133,11 @@ config = {
             # "Pemakaian_Bulan_Terakhir_kWh" dihapus karena membocorkan target secara langsung
             # "Pemakaian_Rata_Rata_3Bulan_kWh" dihapus karena korelasinya terlalu tinggi (0.77) dengan target
             
-            "Jumlah_Bulan_Tagihan_Terisi",
+            # "Jumlah_Bulan_Tagihan_Terisi" dihapus — ZERO VARIANCE (seluruh data = 3)
             # "Jumlah_Bulan_kWh_Terisi" dihapus (Korelasi 1.0 dengan Jumlah_Bulan_Tagihan_Terisi)
             
-            "Tagihan_Relatif_Stabil",
+            # Tagihan_Relatif_Stabil → cukup 1 kolom (2 kolom one-hot = perfectly complementary)
+            "Tagihan_Relatif_Stabil__Ya, relatif stabil",
 
             "Kulkas_Jumlah",
             # "Kulkas_Kategori" dihapus (Korelasi >0.92 dengan Kulkas_EstimasiWattPerUnit)
@@ -169,42 +174,18 @@ config = {
 
             "Alat_Lain_Ada",
 
-            # Alat_Lain_1_Jenis: dipertahankan karena masih memiliki distribusi varians
-            # "Alat_Lain_1_Jenis__Charger HP/perangkat kecil",
-            # "Alat_Lain_1_Jenis__Blender/Mixer",
-            # "Alat_Lain_1_Jenis__Setrika",
-            # "Alat_Lain_1_Jenis__Dispenser",
-            # "Alat_Lain_1_Jenis__Komputer/Laptop",
-            # "Alat_Lain_1_Jenis__Pompa air",
-            # "Alat_Lain_1_Jenis__Oven/Microwave",
-            # "Alat_Lain_1_Jenis__Lainnya",
-            # "Alat_Lain_1_Jumlah",
-            # "Alat_Lain_1_Kategori",
-            # "Alat_Lain_1_EstimasiWatt",
-
-            # # Alat_Lain_2_Jenis: dipertahankan
-            # "Alat_Lain_2_Jenis__Charger HP/perangkat kecil",
-            # "Alat_Lain_2_Jenis__Blender/Mixer",
-            # "Alat_Lain_2_Jenis__Setrika",
-            # "Alat_Lain_2_Jenis__Dispenser",
-            # "Alat_Lain_2_Jenis__Komputer/Laptop",
-            # "Alat_Lain_2_Jenis__Pompa air",
-            # "Alat_Lain_2_Jenis__Oven/Microwave",
-            # "Alat_Lain_2_Jenis__Lainnya",
-            # "Alat_Lain_2_Jumlah",
-            # "Alat_Lain_2_Kategori",
-            # "Alat_Lain_2_EstimasiWatt",
-
-            # --- SPARSITY DROPPED ---
-            # Seluruh "Alat_Lain_3_..." dihapus karena korelasi sangat rendah (<0.05) dan 
-            # mayoritas datanya kosong (variance mendekati 0), yang hanya akan membuat noise pada model.
-
             "Total_Energi_Alat_Lain_kWhPerHari",
             # "Total_Energi_Utama_kWhPerHari" dihapus (Korelasi >0.99 dengan Total_Energi_Semua_kWhPerHari)
             "Total_Energi_Semua_kWhPerHari",
 
             "Total_Energi_Semua_kWhPerBulan",
             "Estimasi_Tarif_Per_kWh_Rp",
+
+            # === ENGINEERED FEATURES ===
+            # Interaksi tarif × konsumsi — sinyal terkuat untuk prediksi biaya
+            "Estimasi_Biaya_Energi_Bulanan_Rp",
+            # Interaksi daya × konsumsi — proxy kapasitas pemakaian sebenarnya  
+            "Daya_x_TotalEnergi",
         ],
     },
 
@@ -255,6 +236,8 @@ config = {
         "Jumlah_Bulan_kWh_Terisi",
         "Total_Energi_Semua_kWhPerBulan",
         "Estimasi_Tarif_Per_kWh_Rp",
+        "Estimasi_Biaya_Energi_Bulanan_Rp",
+        "Daya_x_TotalEnergi",
     ],
     # Ordinal encoding: maps categorical string -> numeric value
     # Ordered by intensity/size so NN can learn magnitude

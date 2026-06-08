@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 
 from src.pipeline.preprocessing import (
-    load_csv,
+    load_and_preprocess,
     train_test_split,
     fit_minmax_scaler,
     transform_minmax,
@@ -275,16 +275,17 @@ def run_training(model_type: str):
     print(f"=== Training model {model_type.upper()} ===\n")
 
     # Load & encode
-    rows = load_csv(cfg["dataset_path"])
+    rows = load_and_preprocess(cfg["dataset_path"])
     print(f"Total data: {len(rows)} baris")
 
     # Extract features & target
     x_data, y_data, feature_columns, target_column = extract_features_and_target(
-        rows=rows,
+        df=rows,
         model_type=model_type,
     )
     input_size = len(feature_columns)
     print(f"Fitur: {input_size} kolom")
+    print(f"Nama fitur: {feature_columns}")
     print(f"Target: {target_column}\n")
 
     # Split
@@ -331,11 +332,13 @@ def run_training(model_type: str):
         x_train=x_train_scaled,
         y_train=y_train_scaled,
         learning_rate=cfg["learning_rate"],
+        batch_size=cfg.get("batch_size", 16),
         patience=cfg["patience"],
         min_delta=cfg["min_delta"],
         epochs=None,
         x_val=x_test_scaled,
         y_val=y_test_scaled,
+        lr_decay=cfg.get("lr_decay", 0.0),
     )
     total_epochs = len(history["train_loss"])
     print(f"Training selesai. Total epoch aktual: {total_epochs}")

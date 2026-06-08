@@ -1,66 +1,313 @@
-import csv
+"""
+Preprocessing Pipeline — Manual implementation tanpa scikit-learn.
+
+Pipeline:
+  1. Noise removal: "Tidak tahu" / "Tidak diisi" → NaN, lalu imputasi modus manual.
+  2. Cyclical encoding: Bulan_Tagihan → sin/cos (periode 12).
+  3. One-Hot Encoding manual: Sumber_Angka_Tagihan, Tagihan_Relatif_Stabil.
+  4. Ordinal encoding rapat (0-based, no gap): kolom frekuensi/ukuran.
+  5. Min-Max scaling manual [0,1] pada kolom ordinal.
+
+Juga menyediakan: train_test_split, fit/transform MinMax untuk fitur & target.
+"""
+
 import math
 import random
-from src.config.config import config
+
+import numpy as np
+import pandas as pd
 
 
-def load_csv(path: str) -> list[dict]:
-    """Load CSV and encode categorical columns to numeric using config mappings."""
-    rows = []
-    ordinal = config["ordinal_encoding"]
-    one_hot = config["one_hot_encoding"]
-    numeric_special = config["numeric_special"]
-    one_hot_nominal = config.get("one_hot_nominal", {})
+# =====================================================================
+# MAPPING DICTIONARIES
+# =====================================================================
 
-    with open(path, mode="r", encoding="utf-8-sig") as file:
-        reader = csv.DictReader(file)
+# --- Kolom yang "Tidak tahu" → NaN lalu imputasi modus ---
+TIDAK_TAHU_COLS = [
+    "Kulkas_Kategori",
+    "AC_PK_Kategori",
+    "Bulan_Tagihan",
+    "Tagihan_Relatif_Stabil",
+]
 
-        for row in reader:
-            cleaned_row = {}
+# --- Kolom yang "Tidak diisi" → NaN lalu imputasi modus ---
+TIDAK_DIISI_COLS = [
+    "Alat_Lain_1_Kategori",
+    "Alat_Lain_2_Kategori",
+    "Alat_Lain_3_Kategori",
+]
 
-            for key, value in row.items():
-                cleaned_key = key.strip()
-                raw = value.strip() if value else ""
+# --- Step 2: Bulan_Tagihan label → angka (sebelum sin/cos) ---
+BULAN_TO_NUM = {
+    "Januari": 1,  "Februari": 2,  "Maret": 3,
+    "April": 4,     "Mei": 5,       "Juni": 6,
+    "Juli": 7,      "Agustus": 8,   "September": 9,
+    "Oktober": 10,  "November": 11, "Desember": 12,
+}
 
-                # Ordinal encoding (kategori dengan urutan bermakna)
-                if cleaned_key in ordinal:
-                    mapping = ordinal[cleaned_key]
-                    cleaned_row[cleaned_key] = float(mapping[raw]) if raw in mapping else 0.0
-                    continue
+# --- Step 3: One-Hot Encoding (nominal, tanpa urutan) ---
+ONE_HOT_COLS = [
+    "Sumber_Angka_Tagihan",
+    "Tagihan_Relatif_Stabil",
+]
 
-                # Binary encoding (e.g. Status_Subsidi_Listrik)
-                if cleaned_key in one_hot:
-                    mapping = one_hot[cleaned_key]
-                    cleaned_row[cleaned_key] = float(mapping[raw]) if raw in mapping else 0.0
-                    continue
+# --- Step 4: Ordinal encoding rapat (0-based, consecutive) ---
+# "Tidak tahu" dan "Tidak diisi" sudah di-imputasi, jadi tidak masuk mapping.
+ORDINAL_MAPS = {
+    "Kulkas_Kategori": {
+        "Tidak ada": 0,
+        "Kecil / 1 pintu": 1,
+        "Sedang / 2 pintu": 2,
+        "Besar / side by side": 3,
+    },
+    "TV_Kategori": {
+        "Tidak ada / tidak digunakan": 0,
+        "Jarang, kurang dari 2 jam per hari": 1,
+        "Sedang, sekitar 2-5 jam per hari": 2,
+        "Sering, sekitar 6-10 jam per hari": 3,
+        "Sangat sering, lebih dari 10 jam per hari": 4,
+    },
+    "AC_Kategori": {
+        "Tidak ada / tidak digunakan": 0,
+        "Jarang, kurang dari 2 jam per hari": 1,
+        "Sedang, sekitar 2-5 jam per hari": 2,
+        "Sering, sekitar 6-10 jam per hari": 3,
+        "Sangat sering, lebih dari 10 jam per hari": 4,
+    },
+    "Kipas_Kategori": {
+        "Tidak ada / tidak digunakan": 0,
+        "Jarang, kurang dari 2 jam per hari": 1,
+        "Sedang, sekitar 2-5 jam per hari": 2,
+        "Sering, sekitar 6-10 jam per hari": 3,
+        "Sangat sering, lebih dari 10 jam per hari": 4,
+    },
+    "RiceCooker_Kategori": {
+        "Tidak ada / tidak digunakan": 0,
+        "Jarang, kurang dari 2 jam per hari": 1,
+        "Sedang, sekitar 2-5 jam per hari": 2,
+        "Sering, sekitar 6-10 jam per hari": 3,
+        "Sangat sering, lebih dari 10 jam per hari": 4,
+    },
+    "MesinCuci_Kategori": {
+        "Tidak ada / tidak digunakan": 0,
+        "Jarang, 1-2 kali per minggu": 1,
+        "Sedang, 3-4 kali per minggu": 2,
+        "Sering, 5-6 kali per minggu": 3,
+        "Sangat sering, hampir setiap hari": 4,
+    },
+    "AC_PK_Kategori": {
+        "Tidak ada AC": 0,
+        "1/2 PK": 1,
+        "3/4 PK": 2,
+        "1 PK": 3,
+        "1.5 PK": 4,
+        "2 PK atau lebih": 5,
+    },
+    "Alat_Lain_1_Kategori": {
+        "Jarang, 1-2 kali per minggu": 0,
+        "Sedang, 3-4 kali per minggu": 1,
+        "Sering, hampir setiap hari": 2,
+        "Sangat sering, setiap hari dan cukup lama": 3,
+    },
+    "Alat_Lain_2_Kategori": {
+        "Jarang, 1-2 kali per minggu": 0,
+        "Sedang, 3-4 kali per minggu": 1,
+        "Sering, hampir setiap hari": 2,
+        "Sangat sering, setiap hari dan cukup lama": 3,
+    },
+    "Alat_Lain_3_Kategori": {
+        "Jarang, 1-2 kali per minggu": 0,
+        "Sedang, 3-4 kali per minggu": 1,
+        "Sering, hampir setiap hari": 2,
+        "Sangat sering, setiap hari dan cukup lama": 3,
+    },
+}
 
-                # One-hot nominal: kolom nominal di-expand menjadi N binary columns.
-                # Kolom asli tidak disimpan; baseline ("Tidak diisi") = semua nol.
-                if cleaned_key in one_hot_nominal:
-                    categories = one_hot_nominal[cleaned_key]
-                    for cat in categories:
-                        cleaned_row[f"{cleaned_key}__{cat}"] = 1.0 if raw == cat else 0.0
-                    continue
+# Kolom ordinal yang akan di-MinMax scale (Step 5)
+ORDINAL_COLS_TO_SCALE = list(ORDINAL_MAPS.keys())
 
-                # Numeric special cases (e.g. "Tidak tahu" in Daya_Listrik_Rumah_VA)
-                if cleaned_key in numeric_special and raw in numeric_special[cleaned_key]:
-                    cleaned_row[cleaned_key] = float(numeric_special[cleaned_key][raw])
-                    continue
 
-                # Parse as float
-                if raw == "":
-                    cleaned_row[cleaned_key] = 0.0
-                else:
-                    try:
-                        cleaned_row[cleaned_key] = float(raw.replace(",", "."))
-                    except ValueError:
-                        # Non-numeric, non-encoded column (e.g. Timestamp, Nama) -> keep as string
-                        cleaned_row[cleaned_key] = raw
+# =====================================================================
+# HELPER FUNCTIONS
+# =====================================================================
 
-            rows.append(cleaned_row)
+def manual_mode(series: pd.Series):
+    """
+    Hitung modus secara manual (kategori paling sering muncul).
+    Mengabaikan NaN. Jika tie, ambil yang pertama ditemukan.
+    """
+    counts: dict = {}
+    for val in series:
+        if pd.isna(val):
+            continue
+        counts[val] = counts.get(val, 0) + 1
+    if not counts:
+        return np.nan
+    # Return key with max count
+    return max(counts, key=counts.get)
 
-    return rows
 
+def manual_minmax(series: pd.Series) -> pd.Series:
+    """
+    Min-Max scaling manual: X_scaled = (X - X_min) / (X_max - X_min).
+    Jika X_max == X_min → return 0.0 (constant column).
+    """
+    x_min = series.min()
+    x_max = series.max()
+    if x_max == x_min:
+        return pd.Series(np.zeros(len(series)), index=series.index, dtype=float)
+    return (series - x_min) / (x_max - x_min)
+
+
+# =====================================================================
+# MAIN PREPROCESSING
+# =====================================================================
+
+def preprocess(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Full preprocessing pipeline. Menerima DataFrame mentah dari CSV,
+    mengembalikan DataFrame bersih siap untuk feature extraction.
+
+    Steps:
+      1. Missing value: "Tidak tahu"/"Tidak diisi" → NaN → imputasi modus.
+      2. Cyclical encoding Bulan_Tagihan → sin/cos.
+      3. One-Hot Encoding Sumber_Angka_Tagihan & Tagihan_Relatif_Stabil.
+      4. Ordinal encoding rapat (0-based, no gap).
+      5. Min-Max scaling pada kolom ordinal.
+    """
+    df = df.copy()
+
+    # =================================================================
+    # STEP 1: Noise Removal & Manual Mode Imputation
+    # =================================================================
+
+    # 1a. "Tidak tahu" → NaN
+    for col in TIDAK_TAHU_COLS:
+        if col in df.columns:
+            df[col] = df[col].replace("Tidak tahu", np.nan)
+
+    # 1b. "Tidak diisi" → NaN
+    for col in TIDAK_DIISI_COLS:
+        if col in df.columns:
+            df[col] = df[col].replace("Tidak diisi", np.nan)
+
+    # 1c. Imputasi NaN dengan modus manual
+    all_impute_cols = TIDAK_TAHU_COLS + TIDAK_DIISI_COLS
+    for col in all_impute_cols:
+        if col in df.columns and df[col].isna().any():
+            mode_val = manual_mode(df[col])
+            df[col] = df[col].fillna(mode_val)
+
+    # =================================================================
+    # STEP 2: Cyclical Encoding — Bulan_Tagihan
+    # =================================================================
+    if "Bulan_Tagihan" in df.columns:
+        # Map nama bulan → angka 1-12
+        bulan_num = df["Bulan_Tagihan"].map(BULAN_TO_NUM)
+
+        # Cyclical transform: sin & cos dengan periode 12
+        df["Bulan_Tagihan_sin"] = np.sin(2 * np.pi * bulan_num / 12)
+        df["Bulan_Tagihan_cos"] = np.cos(2 * np.pi * bulan_num / 12)
+
+        # Hapus kolom asli
+        df = df.drop(columns=["Bulan_Tagihan"])
+
+    # =================================================================
+    # STEP 3: Manual One-Hot Encoding (Nominal)
+    # =================================================================
+    for col in ONE_HOT_COLS:
+        if col not in df.columns:
+            continue
+
+        # Dapatkan unique categories (sorted agar konsisten)
+        categories = sorted(df[col].dropna().unique())
+
+        # Buat binary columns manual
+        for cat in categories:
+            col_name = f"{col}__{cat}"
+            df[col_name] = (df[col] == cat).astype(int)
+
+        # Hapus kolom asli
+        df = df.drop(columns=[col])
+
+    # =================================================================
+    # STEP 4: Ordinal Encoding Rapat (0-based, consecutive)
+    # =================================================================
+    for col, mapping in ORDINAL_MAPS.items():
+        if col in df.columns:
+            df[col] = df[col].map(mapping)
+
+    # =================================================================
+    # STEP 5: Manual Min-Max Scaling pada Kolom Ordinal
+    # =================================================================
+    for col in ORDINAL_COLS_TO_SCALE:
+        if col in df.columns:
+            df[col] = manual_minmax(df[col].astype(float))
+
+    # =================================================================
+    # STEP 6: Feature Engineering — Interaction Features
+    # =================================================================
+    # Estimasi biaya bulanan = tarif × kWh/bulan (sudah ada di CSV)
+    # Jika tidak ada, hitung manual
+    if "Estimasi_Biaya_Energi_Bulanan_Rp" not in df.columns:
+        if "Estimasi_Tarif_Per_kWh_Rp" in df.columns and "Total_Energi_Semua_kWhPerBulan" in df.columns:
+            df["Estimasi_Biaya_Energi_Bulanan_Rp"] = (
+                df["Estimasi_Tarif_Per_kWh_Rp"] * df["Total_Energi_Semua_kWhPerBulan"]
+            )
+
+    # Daya × total energi harian — proxy kapasitas pemakaian
+    if "Daya_Listrik_Rumah_VA" in df.columns and "Total_Energi_Semua_kWhPerHari" in df.columns:
+        df["Daya_x_TotalEnergi"] = (
+            df["Daya_Listrik_Rumah_VA"] * df["Total_Energi_Semua_kWhPerHari"]
+        )
+
+    return df
+
+
+# =====================================================================
+# LOAD CSV + PREPROCESS (pengganti load_csv lama)
+# =====================================================================
+
+def load_and_preprocess(path: str) -> pd.DataFrame:
+    """
+    Baca CSV, lalu jalankan full preprocessing pipeline.
+    Menangani juga kolom numerik khusus (Daya_Listrik_Rumah_VA).
+    """
+    df = pd.read_csv(path, encoding="utf-8-sig")
+
+    # Handle special numeric values sebelum preprocessing
+    if "Daya_Listrik_Rumah_VA" in df.columns:
+        df["Daya_Listrik_Rumah_VA"] = df["Daya_Listrik_Rumah_VA"].replace({
+            "Tidak tahu": 900,
+            "> 5500": 7700,
+        })
+        df["Daya_Listrik_Rumah_VA"] = pd.to_numeric(
+            df["Daya_Listrik_Rumah_VA"], errors="coerce"
+        )
+
+    # Binary encode Status_Subsidi_Listrik
+    if "Status_Subsidi_Listrik" in df.columns:
+        df["Status_Subsidi_Listrik"] = df["Status_Subsidi_Listrik"].map({
+            "Subsidi": 0,
+            "Non Subsidi": 1,
+        }).astype(float)
+
+    # Binary encode Alat_Lain_Ada
+    if "Alat_Lain_Ada" in df.columns:
+        df["Alat_Lain_Ada"] = df["Alat_Lain_Ada"].map({
+            "Tidak": 0,
+            "Ya": 1,
+        }).astype(float)
+
+    # Run main preprocessing
+    df = preprocess(df)
+
+    return df
+
+
+# =====================================================================
+# TRAIN/TEST SPLIT
+# =====================================================================
 
 def train_test_split(
     x_data: list[list[float]],
@@ -86,6 +333,10 @@ def train_test_split(
 
     return x_train, x_test, y_train, y_test
 
+
+# =====================================================================
+# FIT / TRANSFORM MIN-MAX SCALER (untuk fitur numerik global)
+# =====================================================================
 
 def fit_minmax_scaler(x_data: list[list[float]]) -> dict:
     total_features = len(x_data[0])
@@ -126,6 +377,10 @@ def transform_minmax(x_data: list[list[float]], scaler: dict) -> list[list[float
 
     return scaled_data
 
+
+# =====================================================================
+# FIT / TRANSFORM TARGET SCALER
+# =====================================================================
 
 def fit_target_scaler(y_data: list[float], use_log: bool = False) -> dict:
     """Fit MinMax scaler on target values, optionally with log-transform."""

@@ -70,6 +70,37 @@ class NeuralNetwork(ABC):
         ...
 
     @abstractmethod
+    def train_batch(
+        self,
+        x_batch: list[list[float]],
+        y_batch: list[float],
+        learning_rate: float,
+    ) -> float:
+        """
+        Melatih model dengan satu mini-batch data.
+
+        Proses:
+          1. Untuk setiap sampel dalam batch:
+             - forward pass → hitung prediksi
+             - backward pass → hitung gradient (delta)
+             - akumulasi gradient (TANPA update bobot)
+          2. Setelah semua sampel diproses:
+             - rata-ratakan gradient terakumulasi (bagi dengan batch_size)
+             - clip gradient
+             - update bobot: w -= lr * (avg_grad + l2_lambda * w)
+             - update bias:  b -= lr * avg_grad_bias
+
+        Args:
+            x_batch      : List berisi input tiap sampel dalam batch.
+            y_batch      : List berisi target tiap sampel dalam batch.
+            learning_rate: Laju pembelajaran.
+
+        Returns:
+            Rata-rata MSE loss untuk batch ini.
+        """
+        ...
+
+    @abstractmethod
     def predict(self, inputs: list[float]) -> float:
         """
         Melakukan inferensi tanpa memperbarui bobot (inference only).
