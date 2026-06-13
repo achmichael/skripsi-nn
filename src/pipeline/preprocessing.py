@@ -245,10 +245,43 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
             df[col] = manual_minmax(df[col].astype(float))
 
     # =================================================================
-    # STEP 6: Feature Engineering — Interaction Features
+    # STEP 6: Feature Engineering — Physical Approximations & Interactions
     # =================================================================
+    
+    # Fungsi pembantu untuk menghitung tarif eksak PLN
+    def hitung_tarif(row):
+        daya = row.get("Daya_Listrik_Rumah_VA", 900)
+        subsidi = row.get("Status_Subsidi_Listrik", 1.0) # 0.0 = Subsidi, 1.0 = Non Subsidi
+        
+        if daya <= 450: return 415.0
+        if daya == 900: return 605.0 if subsidi == 0.0 else 1352.0
+        if daya in [1300, 2200]: return 1444.70
+        if daya > 2200: return 1699.53
+        return 1444.70 # Default
+
+    if "Daya_Listrik_Rumah_VA" in df.columns and "Status_Subsidi_Listrik" in df.columns:
+        df["Tarif_PLN_Eksak_Rp"] = df.apply(hitung_tarif, axis=1)
+    else:
+        # Fallback if columns are somehow missing
+        df["Tarif_PLN_Eksak_Rp"] = df.get("Estimasi_Tarif_Per_kWh_Rp", 1444.70)
+
+    # 1. PRABAYAR: Estimasi Fisika Durasi Hari
+    #    (Nominal - Admin) / 1.05 PPJ / Tarif / Total kWh harian
+    if "Nominal_Token_Terakhir_Rp" in df.columns and "Total_Energi_Semua_kWhPerHari" in df.columns:
+        df["Estimasi_kWh_Didapat"] = ((df["Nominal_Token_Terakhir_Rp"] - 2500) / 1.05) / df["Tarif_PLN_Eksak_Rp"]
+        df["Estimasi_Fisika_Durasi_Hari"] = df["Estimasi_kWh_Didapat"] / (df["Total_Energi_Semua_kWhPerHari"] + 0.1)
+    else:
+        df["Estimasi_Fisika_Durasi_Hari"] = 0.0
+
+    # 2. PASCABAYAR: Estimasi Fisika Tagihan Rp
+    #    Total kWh bulanan * Tarif * 1.05 PPJ + 2500 Admin
+    if "Total_Energi_Semua_kWhPerBulan" in df.columns:
+        df["Estimasi_Fisika_Tagihan_Rp"] = (df["Total_Energi_Semua_kWhPerBulan"] * df["Tarif_PLN_Eksak_Rp"] * 1.05) + 2500
+    else:
+        df["Estimasi_Fisika_Tagihan_Rp"] = 0.0
+
     # Estimasi biaya bulanan = tarif × kWh/bulan (sudah ada di CSV)
-    # Jika tidak ada, hitung manual
+    # Jika tidak ada, hitung manual (fallback lama)
     if "Estimasi_Biaya_Energi_Bulanan_Rp" not in df.columns:
         if "Estimasi_Tarif_Per_kWh_Rp" in df.columns and "Total_Energi_Semua_kWhPerBulan" in df.columns:
             df["Estimasi_Biaya_Energi_Bulanan_Rp"] = (

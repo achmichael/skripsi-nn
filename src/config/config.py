@@ -5,7 +5,7 @@ config = {
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
         "hidden_layers": [64, 32],
-        "learning_rate": 0.001,
+        "learning_rate": 0.005,
         "patience": 5,
         "min_delta": 1e-4,
         "clip_value": 5.0,
@@ -19,7 +19,7 @@ config = {
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
         "hidden_layers": [128, 64, 32],
-        "learning_rate": 0.001,
+        "learning_rate": 0.005,
 
         "patience": 30,
         "min_delta": 1e-5,
@@ -30,7 +30,7 @@ config = {
         "target_label": "estimasi biaya (Rp)",
         # "target": "Tagihan_Bulan_Terakhir_Rp",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
-        "use_log_transform": True,
+        "use_log_transform": False,
     },
     "features": {
         "prabayar": [
@@ -122,6 +122,9 @@ config = {
             "Total_Energi_Alat_Lain_kWhPerHari",
             "Total_Energi_Utama_kWhPerHari",
             "Total_Energi_Semua_kWhPerHari",
+            
+            # === ENGINEERED FEATURES ===
+            "Estimasi_Fisika_Durasi_Hari",
         ],
 
         "pascabayar": [
@@ -186,6 +189,8 @@ config = {
             "Estimasi_Biaya_Energi_Bulanan_Rp",
             # Interaksi daya × konsumsi — proxy kapasitas pemakaian sebenarnya  
             "Daya_x_TotalEnergi",
+            # Estimator biaya berdasarkan aturan PLN + PPJ
+            "Estimasi_Fisika_Tagihan_Rp",
         ],
     },
 
@@ -238,6 +243,8 @@ config = {
         "Estimasi_Tarif_Per_kWh_Rp",
         "Estimasi_Biaya_Energi_Bulanan_Rp",
         "Daya_x_TotalEnergi",
+        "Estimasi_Fisika_Durasi_Hari",
+        "Estimasi_Fisika_Tagihan_Rp",
     ],
     # Ordinal encoding: maps categorical string -> numeric value
     # Ordered by intensity/size so NN can learn magnitude
