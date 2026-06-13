@@ -37,7 +37,12 @@ def extract_features_and_target(
     if target_column not in available_columns:
         raise ValueError(f"Kolom target '{target_column}' tidak ditemukan di dataset.")
 
-    x_data = df[feature_columns].values.tolist()
+    x_df = df[feature_columns].apply(pd.to_numeric, errors='coerce')
+    if x_df.isna().any().any():
+        bad_cols = x_df.columns[x_df.isna().any()].tolist()
+        raise ValueError(f"Non-numeric values found in columns: {bad_cols}")
+        
+    x_data = x_df.values.tolist()
     y_data = df[target_column].values.tolist()
 
     return x_data, y_data, feature_columns, target_column
