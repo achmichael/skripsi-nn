@@ -179,80 +179,171 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
     print(f"Scatter plot disimpan ke: {save_path}")
 
 
-def save_error_distribution(errors, save_path: str, model_type: str):
-    """Plot distribusi error dalam juta Rp dengan statistik ringkas dan zona under/overprediction."""
-    scale = 1_000_000
-    errors_m = [e / scale for e in errors]
+def plot_error_distribution(
+    y_true: list[float],
+    y_pred: list[float],
+    mae_rupiah: float,
+    save_path: str | None = None,
+    show: bool = True,
+) -> None:
+    """
+    Membuat visualisasi distribusi error prediksi Neural Network dan 
+    breakdown Mean Absolute Error (MAE) berdasarkan bucket tagihan aktual.
 
-    n = len(errors_m)
-    mean_e  = sum(errors_m) / n
-    sorted_e = sorted(errors_m)
-    mid = n // 2
-    median_e = (sorted_e[mid - 1] + sorted_e[mid]) / 2 if n % 2 == 0 else sorted_e[mid]
-    variance = sum((e - mean_e) ** 2 for e in errors_m) / n
-    std_e = variance ** 0.5
+    Args:
+        y_true: List nilai aktual (dalam Rupiah).
+        y_pred: List nilai prediksi model (dalam Rupiah).
+        mae_rupiah: Nilai keseluruhan Mean Absolute Error (dalam Rupiah).
+        save_path: Path opsional untuk menyimpan grafik sebagai PNG.
+        show: Apakah akan menampilkan plot secara interaktif.
+    """
+    import numpy as np
+    import matplotlib.pyplot as plt
 
-    n_over  = sum(1 for e in errors_m if e > 0)   # prediksi lebih tinggi
-    n_under = sum(1 for e in errors_m if e < 0)   # prediksi lebih rendah
-    n_exact = n - n_over - n_under
+    y_t = np.array(y_true)
+    y_p = np.array(y_pred)
+    errors = y_p - y_t
 
-    fig, ax = plt.subplots(figsize=(11, 6))
+    n = len(errors)
+    if n == 0:
+        return
 
-    # Zona warna background: merah=underprediction, hijau=overprediction
-    x_min = min(errors_m)
-    x_max = max(errors_m)
-    ax.axvspan(x_min, 0, alpha=0.06, color="#F44336", label="_nolegend_")
-    ax.axvspan(0, x_max, alpha=0.06, color="#4CAF50", label="_nolegend_")
+    # REQUIREMENT 1: Auto Unit Scaling
+    max_abs_err = np.max(np.abs(errors))
+    if max_abs_err < 500_000:
+        unit_divider = 1_000.0
+        unit_name = "ribu Rp"
+    else:
+        unit_divider = 1_000_000.0
+        unit_name = "juta Rp"
 
-    # Histogram
-    ax.hist(errors_m, bins=25, color="#5C6BC0", edgecolor="white", linewidth=0.6, alpha=0.85, zorder=3)
+    errors_scaled = errors / unit_divider
+    mae_scaled = mae_rupiah / unit_divider
+    
+    mean_e = np.mean(errors_scaled)
+    median_e = np.median(errors_scaled)
+    std_e = np.std(errors_scaled)
+    min_e = np.min(errors_scaled)
+    max_e = np.max(errors_scaled)
+    range_e = max_e - min_e
 
-    # Garis referensi
-    ax.axvline(x=0,      color="#212121", linestyle="-",  linewidth=2.0, label="Zero error",       zorder=4)
-    ax.axvline(x=mean_e, color="#FF5722", linestyle="--", linewidth=1.8, label=f"Mean = {mean_e:+,.1f} jt",   zorder=4)
-    ax.axvline(x=median_e, color="#FFC107", linestyle=":", linewidth=1.8, label=f"Median = {median_e:+,.1f} jt", zorder=4)
+    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(12, 10))
 
-    # Label zona di atas grafik
-    ax.text(0.02, 0.97, f"Underprediksi\n({n_under} titik, {n_under/n*100:.1f}%)",
-            transform=ax.transAxes, fontsize=9, va="top", ha="left",
-            color="#C62828", fontweight="bold")
-    ax.text(0.98, 0.97, f"Overprediksi\n({n_over} titik, {n_over/n*100:.1f}%)",
-            transform=ax.transAxes, fontsize=9, va="top", ha="right",
-            color="#2E7D32", fontweight="bold")
+    # =========================================================================
+    # REQUIREMENT 2: Error Distribution Plot (Subplot 1)
+    # =========================================================================
+    
+    # 2a: Fixed 30 bins
+    ax1.hist(errors_scaled, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
+    
+    # 2b & 2c: 10 evenly spaced ticks formatted to 1 decimal with + sign
+    ticks = np.linspace(min_e, max_e, 10)
+    ax1.set_xticks(ticks)
+    ax1.set_xticklabels([f"{v:+.1f}" for v in ticks])
+    
+    ax1.set_xlabel(f"Error ({unit_name}) [Prediksi - Aktual]", fontsize=12)
+    ax1.set_ylabel("Frekuensi", fontsize=12)
+    ax1.set_title("Distribusi Error Prediksi", fontsize=14, fontweight='bold')
 
-    # Format sumbu X
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(lambda x, _: f"{x:+,.0f} jt"))
-    ax.tick_params(axis='x', rotation=20)
+    # 2f: Light green shaded region for ±MAE
+    ax1.axvspan(-mae_scaled, mae_scaled, color='lightgreen', alpha=0.3, label='±MAE zone')
 
-    ax.set_xlabel("Error = Prediksi − Aktual (juta Rp)", fontsize=12)
-    ax.set_ylabel("Frekuensi", fontsize=12)
-    ax.set_title(
-        f"Distribusi Error Prediksi — {model_type.upper()}",
-        fontsize=14, fontweight="bold"
-    )
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3, axis="y")
+    # 2e: Reference lines with dynamic anti-overlap offsets (0.5% of range)
+    offset = max(range_e * 0.005, 1e-5)
+    mean_offset = 0.0
+    median_offset = 0.0
+    
+    if abs(mean_e - 0.0) <= offset * 2:
+        mean_offset = offset
+    
+    if abs(median_e - 0.0) <= offset * 2 or abs(median_e - mean_e) <= offset * 2:
+        median_offset = -offset
 
-    # Kotak statistik
+    ax1.axvline(0, color='black', linestyle='-', linewidth=2, label='Zero Error')
+    ax1.axvline(mean_e + mean_offset, color='orange', linestyle='--', linewidth=2, label='Mean')
+    ax1.axvline(median_e + median_offset, color='yellow', linestyle=':', linewidth=2, label='Median')
+    
+    ax1.legend(loc='upper left', fontsize=10)
+
+    # 2d: Annotation box
     stats_text = (
         f"n = {n} data\n"
-        f"Std Dev = {std_e:,.1f} jt\n"
-        f"Min = {min(errors_m):+,.1f} jt\n"
-        f"Max = {max(errors_m):+,.1f} jt"
+        f"Mean = {mean_e:+.1f} {unit_name}\n"
+        f"Median = {median_e:+.1f} {unit_name}\n"
+        f"Std Dev = {std_e:.1f} {unit_name}\n"
+        f"Range: [{min_e:+.1f}, {max_e:+.1f}] {unit_name}"
     )
-    ax.text(
-        0.98, 0.60, stats_text,
-        transform=ax.transAxes,
-        fontsize=9,
-        verticalalignment="top",
-        horizontalalignment="right",
-        bbox=dict(boxstyle="round,pad=0.4", facecolor="white", alpha=0.85, edgecolor="gray"),
-    )
+    props = dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8, edgecolor='gray')
+    ax1.text(0.95, 0.95, stats_text, transform=ax1.transAxes, fontsize=10,
+             verticalalignment='top', horizontalalignment='right', bbox=props)
+
+    # =========================================================================
+    # REQUIREMENT 3: Per-Bucket Error Breakdown (Subplot 2)
+    # =========================================================================
+    
+    buckets = [
+        (0, 150_000, "0–150rb"),
+        (150_000, 300_000, "150–300rb"),
+        (300_000, 500_000, "300–500rb"),
+        (500_000, 750_000, "500–750rb"),
+        (750_000, float('inf'), "750rb+")
+    ]
+    
+    bucket_labels = []
+    bucket_maes = []
+    bucket_counts = []
+    bucket_colors = []
+    
+    for low, high, label in buckets:
+        mask = (y_t >= low) & (y_t < high)
+        count = np.sum(mask)
+        
+        bucket_labels.append(label)
+        bucket_counts.append(count)
+        
+        if count > 0:
+            bucket_errs = errors[mask]
+            b_mae_raw = np.mean(np.abs(bucket_errs))
+            b_mae_ribu = b_mae_raw / 1000.0
+            
+            bucket_maes.append(b_mae_ribu)
+            
+            if b_mae_raw < 100_000:
+                bucket_colors.append('green')
+            elif b_mae_raw < 200_000:
+                bucket_colors.append('yellow')
+            else:
+                bucket_colors.append('red')
+        else:
+            bucket_maes.append(0.0)
+            bucket_colors.append('gray')
+            
+    x_pos = np.arange(len(buckets))
+    bars = ax2.bar(x_pos, bucket_maes, color=bucket_colors, edgecolor='black', alpha=0.7)
+    
+    ax2.set_xticks(x_pos)
+    ax2.set_xticklabels(bucket_labels, fontsize=10)
+    ax2.set_xlabel("Tagihan Aktual", fontsize=12)
+    ax2.set_ylabel("MAE (ribu Rp)", fontsize=12)
+    ax2.set_title("Mean Absolute Error per Bucket Tagihan Aktual", fontsize=14, fontweight='bold')
+    
+    # Annotate bars with sample counts
+    for bar, count in zip(bars, bucket_counts):
+        height = bar.get_height()
+        if count > 0:
+            ax2.text(bar.get_x() + bar.get_width() / 2.0, height,
+                     f"n={count}", ha='center', va='bottom', fontsize=10)
 
     plt.tight_layout()
-    plt.savefig(save_path, dpi=150)
-    plt.close()
-    print(f"Error distribution disimpan ke: {save_path}")
+    
+    if save_path:
+        plt.savefig(save_path, dpi=150)
+        print(f"Error distribution disimpan ke: {save_path}")
+        
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
 
 
 def save_metrics_json(metrics: dict, save_path: str):
@@ -408,10 +499,12 @@ def run_training(model_type: str):
     )
 
     # 3. Error distribution
-    save_error_distribution(
-        errors=errors_orig,
+    plot_error_distribution(
+        y_true=y_test,
+        y_pred=preds_orig,
+        mae_rupiah=mae_orig,
         save_path=os.path.join(metrics_dir, "error_distribution.png"),
-        model_type=model_type,
+        show=False,
     )
 
     # 4. Metrics JSON
