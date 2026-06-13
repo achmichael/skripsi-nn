@@ -18,7 +18,7 @@ config = {
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
-        "hidden_layers": [128, 64, 32],
+        "hidden_layers": [64, 32],
         "learning_rate": 0.005,
 
         "patience": 30,
