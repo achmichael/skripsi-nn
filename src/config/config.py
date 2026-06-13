@@ -24,7 +24,7 @@ config = {
         "patience": 30,
         "min_delta": 1e-5,
         "clip_value": 5.0,
-        "batch_size": 16,
+        "batch_size": 32,
         "l2_lambda": 1e-4,
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",

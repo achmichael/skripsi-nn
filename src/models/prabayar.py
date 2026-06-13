@@ -1,34 +1,12 @@
-"""
-PrabayarModel — Implementasi NeuralNetwork untuk prediksi durasi token listrik prabayar.
-
-Arsitektur default: [input, 64, 32, 1]
-Aktivasi hidden layer: ReLU
-Output layer: linear (regresi)
-Inisialisasi bobot: He initialization
-"""
-
 import json
 import math
-import random
+import numpy as np
 
 from src.activations.ReLU import relu, relu_derivative
 from src.models.neural_network import NeuralNetwork
 
 
 class PrabayarModel(NeuralNetwork):
-    """
-    Model jaringan saraf untuk memprediksi durasi token listrik prabayar (hari).
-
-    Mendukung arsitektur multi-layer yang dikonfigurasi melalui layer_sizes.
-    Contoh: layer_sizes=[47, 64, 32, 1] menghasilkan 2 hidden layer.
-
-    Args:
-        layer_sizes: Daftar ukuran tiap layer, contoh [47, 64, 32, 1].
-                     Elemen pertama = input size, terakhir = output size (harus 1).
-        seed       : Seed untuk reproduksibilitas inisialisasi bobot.
-        clip_value : Batas gradient clipping untuk mencegah exploding gradient.
-    """
-
     def __init__(
         self,
         layer_sizes: list[int],
@@ -50,50 +28,27 @@ class PrabayarModel(NeuralNetwork):
         self.num_layers = len(layer_sizes)
 
         if seed is not None:
-            random.seed(seed)
+            np.random.seed(seed)
 
-        # Inisialisasi bobot dan bias untuk setiap layer (l -> l+1)
-        # weights[l][j][i] = bobot dari neuron i di layer l ke neuron j di layer l+1
-        self.weights: list[list[list[float]]] = []
-        self.biases: list[list[float]] = []
+        self.weights: list[np.ndarray] = []
+        self.biases: list[np.ndarray] = []
 
         for l in range(self.num_layers - 1):
             fan_in = layer_sizes[l]
+            fan_out = layer_sizes[l + 1]
             std = math.sqrt(2.0 / fan_in)  # He initialization
 
-            layer_weights = []
-            for j in range(layer_sizes[l + 1]):
-                neuron_weights = []
-                for i in range(fan_in):
-                    u1 = random.random() or 1e-10
-                    u2 = random.random()
-                    z = math.sqrt(-2.0 * math.log(u1)) * math.cos(2.0 * math.pi * u2)
-                    neuron_weights.append(z * std)
-                layer_weights.append(neuron_weights)
+            W = np.random.randn(fan_out, fan_in) * std
+            b = np.zeros(fan_out)
 
-            self.weights.append(layer_weights)
-            self.biases.append([0.0] * layer_sizes[l + 1])
+            self.weights.append(W)
+            self.biases.append(b)
 
-        # Cache untuk forward/backward pass
-        self._activations: list[list[float]] = []      # output tiap layer (post-aktivasi)
-        self._pre_activations: list[list[float]] = []  # nilai sebelum aktivasi (z)
+        # Cache untuk forward/backward pass (list of arrays)
+        self._activations: list[np.ndarray] = []      
+        self._pre_activations: list[np.ndarray] = []  
 
-    # ------------------------------------------------------------------
-    # Implementasi abstract methods dari NeuralNetwork
-    # ------------------------------------------------------------------
-
-    def forward(self, inputs: list[float]) -> float:
-        """
-        Propagasi maju melewati semua layer.
-
-        Hidden layers menggunakan ReLU, output layer menggunakan linear.
-
-        Args:
-            inputs: Vektor fitur input (sudah dinormalisasi).
-
-        Returns:
-            Nilai prediksi durasi token dalam hari (float, skala normalisasi).
-        """
+    def forward(self, inputs: np.ndarray) -> np.ndarray:
         self._activations = [inputs]
         self._pre_activations = []
 
@@ -101,285 +56,87 @@ class PrabayarModel(NeuralNetwork):
 
         for l in range(self.num_layers - 1):
             is_output_layer = (l == self.num_layers - 2)
-            fan_out = self.layer_sizes[l + 1]
-            z_layer = []
-            a_layer = []
+            
+            # current shape: (batch_size, fan_in) or (fan_in,)
+            # W shape: (fan_out, fan_in)
+            # W.T shape: (fan_in, fan_out)
+            # z shape: (batch_size, fan_out)
+            z = np.dot(current, self.weights[l].T) + self.biases[l]
+            
+            self._pre_activations.append(z)
+            
+            a = z if is_output_layer else relu(z)
+            self._activations.append(a)
+            current = a
 
-            for j in range(fan_out):
-                z = self.biases[l][j]
-                for i, x in enumerate(current):
-                    z += self.weights[l][j][i] * x
+        return current
 
-                z_layer.append(z)
-                # Hidden layers: ReLU | Output layer: linear
-                a_layer.append(z if is_output_layer else relu(z))
-
-            self._pre_activations.append(z_layer)
-            self._activations.append(a_layer)
-            current = a_layer
-
-        return current[0]
-
-    def backward(self, target: float, learning_rate: float) -> None:
-        """
-        Backpropagation dengan gradient clipping.
-
-        Args:
-            target       : Nilai target aktual (skala normalisasi).
-            learning_rate: Laju pembelajaran.
-        """
-        prediction = self._activations[-1][0]
-
-        # Gradient loss: d(MSE)/d(output) = 2*(pred - target)
-        output_grad = 2.0 * (prediction - target)
-
-        # Inisialisasi delta per layer
-        deltas: list[list[float]] = [None] * (self.num_layers - 1)  # type: ignore
-
-        # Output layer (linear)
-        deltas[-1] = [self._clip_gradient(output_grad, self.clip_value)]
-
-        # Hidden layers (dari kanan ke kiri)
-        for l in range(self.num_layers - 3, -1, -1):
-            fan_out_next = self.layer_sizes[l + 2]
-            fan_out_curr = self.layer_sizes[l + 1]
-            delta_curr = []
-
-            for i in range(fan_out_curr):
-                grad = 0.0
-                for j in range(fan_out_next):
-                    grad += self.weights[l + 1][j][i] * deltas[l + 1][j]
-
-                grad *= relu_derivative(self._pre_activations[l][i])
-                delta_curr.append(self._clip_gradient(grad, self.clip_value))
-
-            deltas[l] = delta_curr
-
-        # Update bobot dan bias
-        for l in range(self.num_layers - 1):
-            inputs_l = self._activations[l]
-            for j in range(self.layer_sizes[l + 1]):
-                for i in range(self.layer_sizes[l]):
-                    self.weights[l][j][i] -= learning_rate * deltas[l][j] * inputs_l[i]
-                self.biases[l][j] -= learning_rate * deltas[l][j]
+    def backward(self, target: np.ndarray, learning_rate: float) -> None:
+        pass # Only train_batch is used in optimization
 
     def train_one_sample(
         self,
-        inputs: list[float],
-        target: float,
+        inputs: np.ndarray,
+        target: np.ndarray,
         learning_rate: float,
     ) -> float:
-        """
-        Satu langkah pelatihan: forward → loss → backward.
-
-        Args:
-            inputs       : Vektor fitur input (sudah dinormalisasi).
-            target       : Nilai target aktual (sudah dinormalisasi).
-            learning_rate: Laju pembelajaran.
-
-        Returns:
-            MSE loss untuk sampel ini.
-        """
-        prediction = self.forward(inputs)
-        loss = self._mse_loss(prediction, target)
-        self.backward(target, learning_rate)
-        return loss
-
-    # ------------------------------------------------------------------
-    # Mini-Batch Gradient Descent
-    # ------------------------------------------------------------------
-
-    def _compute_deltas(self, target: float) -> list[list[float]]:
-        """
-        Hitung delta (error signal) untuk setiap neuron di setiap layer.
-        Dipanggil SETELAH forward() karena membutuhkan _activations dan
-        _pre_activations yang sudah terisi.
-
-        Rumus:
-          - Output layer (linear): delta = d(MSE)/d(output) = 2*(pred - target)
-          - Hidden layer (ReLU) : delta_i = (Σ_j w_ji * delta_j) * ReLU'(z_i)
-            (error mengalir mundur dari layer berikutnya melalui bobot)
-
-        Args:
-            target: Nilai target aktual untuk sampel ini.
-
-        Returns:
-            deltas: List of list, deltas[l][j] = delta untuk neuron j di layer l.
-        """
-        prediction = self._activations[-1][0]
-        output_grad = 2.0 * (prediction - target)
-
-        deltas: list[list[float]] = [None] * (self.num_layers - 1)  # type: ignore
-
-        # Output layer (aktivasi linear, jadi delta = output_grad langsung)
-        deltas[-1] = [self._clip_gradient(output_grad, self.clip_value)]
-
-        # Hidden layers: propagasi error dari kanan ke kiri
-        for l in range(self.num_layers - 3, -1, -1):
-            fan_out_next = self.layer_sizes[l + 2]
-            fan_out_curr = self.layer_sizes[l + 1]
-            delta_curr = []
-
-            for i in range(fan_out_curr):
-                grad = 0.0
-                for j in range(fan_out_next):
-                    grad += self.weights[l + 1][j][i] * deltas[l + 1][j]
-                grad *= relu_derivative(self._pre_activations[l][i])
-                delta_curr.append(self._clip_gradient(grad, self.clip_value))
-
-            deltas[l] = delta_curr
-
-        return deltas
+        # Konversi ke bentuk batch berukuran 1
+        return self.train_batch(inputs[np.newaxis, :], target[np.newaxis, :], learning_rate)
 
     def train_batch(
         self,
-        x_batch: list[list[float]],
-        y_batch: list[float],
+        x_batch: np.ndarray,
+        y_batch: np.ndarray,
         learning_rate: float,
     ) -> float:
-        """
-        Melatih model dengan satu mini-batch data menggunakan
-        Mini-Batch Gradient Descent.
+        batch_size = x_batch.shape[0]
 
-        ═══════════════════════════════════════════════════════
-        PERBEDAAN UTAMA DENGAN train_one_sample / backward:
-        ═══════════════════════════════════════════════════════
-        Pada Pure SGD (train_one_sample + backward):
-          → Setiap 1 baris data langsung update bobot.
-          → Dengan data kuesioner yang noisy, bobot "terombang-ambing"
-            karena tiap sampel menarik bobot ke arah berbeda.
-          → Ini menyebabkan "regression to the mean".
+        # 1. Forward pass
+        prediction = self.forward(x_batch) # shape: (batch_size, 1)
+        if y_batch.ndim == 1:
+            y_batch = y_batch.reshape(-1, 1)
 
-        Pada Mini-Batch GD (train_batch):
-          → Kita proses batch_size sampel dulu (misal 16 atau 32).
-          → Gradient dari setiap sampel DIAKUMULASI, bukan langsung
-            dipakai update.
-          → Setelah seluruh batch selesai, gradient DIRATA-RATAKAN
-            (dibagi batch_size), baru kemudian update bobot SEKALI.
-          → Rata-rata ini "meredam" noise dari sampel individual,
-            sehingga arah update bobot lebih stabil dan akurat.
+        total_loss = self._mse_loss(prediction, y_batch)
 
-        ALGORITMA STEP-BY-STEP:
-        ───────────────────────
-        1. Buat akumulator gradient = 0 (bentuknya sama persis dengan
-           struktur weights dan biases model)
+        # 2. Backward pass
+        # Output layer gradient
+        output_grad = 2.0 * (prediction - y_batch) / batch_size # shape: (batch_size, 1)
+        output_grad = self._clip_gradient(output_grad, self.clip_value)
 
-        2. Untuk SETIAP sampel dalam batch:
-           a. Forward pass  → hitung prediksi
-           b. Compute deltas → hitung error signal (delta) per neuron
-           c. Hitung gradient:
-              - gradient bobot = delta_j × input_i
-              - gradient bias  = delta_j
-           d. TAMBAHKAN gradient ke akumulator (JANGAN update bobot!)
+        deltas = [None] * (self.num_layers - 1)
+        deltas[-1] = output_grad
 
-        3. Setelah SEMUA sampel dalam batch selesai:
-           a. Bagi akumulator dengan batch_size → gradient rata-rata
-           b. Clip gradient rata-rata
-           c. Update bobot: w -= learning_rate × avg_grad
-           d. Update bias:  b -= learning_rate × avg_grad_bias
+        # Hidden layers gradient
+        for l in range(self.num_layers - 3, -1, -1):
+            # deltas[l+1] shape: (batch_size, fan_out_next)
+            # weights[l+1] shape: (fan_out_next, fan_out_curr)
+            grad = np.dot(deltas[l + 1], self.weights[l + 1]) # shape: (batch_size, fan_out_curr)
+            grad *= relu_derivative(self._pre_activations[l])
+            deltas[l] = self._clip_gradient(grad, self.clip_value)
 
-        Args:
-            x_batch      : List of list, setiap elemen = 1 input sample.
-            y_batch      : List of float, target untuk setiap sampel.
-            learning_rate: Laju pembelajaran.
-
-        Returns:
-            Rata-rata MSE loss untuk batch ini.
-        """
-        batch_size = len(x_batch)
-
-        # =============================================================
-        # LANGKAH 1: Inisialisasi akumulator gradient ke nol
-        # =============================================================
-        # Strukturnya mengikuti self.weights dan self.biases:
-        #   acc_w[l][j][i] = akumulasi gradient untuk weights[l][j][i]
-        #   acc_b[l][j]    = akumulasi gradient untuk biases[l][j]
-        acc_w: list[list[list[float]]] = []
-        acc_b: list[list[float]] = []
-
+        # 3. Update bobot dan bias
         for l in range(self.num_layers - 1):
-            layer_w = []
-            for j in range(self.layer_sizes[l + 1]):
-                layer_w.append([0.0] * self.layer_sizes[l])
-            acc_w.append(layer_w)
-            acc_b.append([0.0] * self.layer_sizes[l + 1])
+            inputs_l = self._activations[l] # shape: (batch_size, fan_in)
+            
+            # gradient weights shape: (fan_out, fan_in)
+            grad_w = np.dot(deltas[l].T, inputs_l)
+            grad_b = np.sum(deltas[l], axis=0)
 
-        total_loss = 0.0
+            self.weights[l] -= learning_rate * grad_w
+            self.biases[l] -= learning_rate * grad_b
 
-        # =============================================================
-        # LANGKAH 2: Loop setiap sampel → forward, delta, akumulasi
-        # =============================================================
-        for s in range(batch_size):
-            inputs = x_batch[s]
-            target = y_batch[s]
+        return float(total_loss)
 
-            # 2a. Forward pass
-            prediction = self.forward(inputs)
-
-            # Catat loss untuk monitoring
-            total_loss += self._mse_loss(prediction, target)
-
-            # 2b. Hitung deltas (error signal per neuron)
-            deltas = self._compute_deltas(target)
-
-            # 2c-2d. Hitung gradient dan AKUMULASI
-            for l in range(self.num_layers - 1):
-                inputs_l = self._activations[l]
-
-                for j in range(self.layer_sizes[l + 1]):
-                    for i in range(self.layer_sizes[l]):
-                        acc_w[l][j][i] += deltas[l][j] * inputs_l[i]
-
-                    acc_b[l][j] += deltas[l][j]
-
-        # =============================================================
-        # LANGKAH 3: Rata-rata gradient, clip, lalu update bobot
-        # =============================================================
-        for l in range(self.num_layers - 1):
-            for j in range(self.layer_sizes[l + 1]):
-                for i in range(self.layer_sizes[l]):
-                    # 3a. Rata-ratakan gradient
-                    avg_grad = acc_w[l][j][i] / batch_size
-
-                    # 3b. Clip gradient
-                    avg_grad = self._clip_gradient(avg_grad, self.clip_value)
-
-                    # 3c. Update bobot (tanpa L2 untuk PrabayarModel)
-                    self.weights[l][j][i] -= learning_rate * avg_grad
-
-                # 3d. Update bias
-                avg_bias_grad = acc_b[l][j] / batch_size
-                avg_bias_grad = self._clip_gradient(avg_bias_grad, self.clip_value)
-                self.biases[l][j] -= learning_rate * avg_bias_grad
-
-        return total_loss / batch_size
-
-    def predict(self, inputs: list[float]) -> float:
-        """
-        Inferensi tanpa memperbarui bobot.
-
-        Args:
-            inputs: Vektor fitur input (sudah dinormalisasi).
-
-        Returns:
-            Nilai prediksi durasi token (float, skala normalisasi).
-        """
+    def predict(self, inputs: np.ndarray) -> np.ndarray:
         return self.forward(inputs)
 
     def save(self, path: str, metadata: dict | None = None) -> None:
-        """
-        Simpan bobot model dan metadata ke file JSON.
-
-        Args:
-            path    : Path file JSON tujuan.
-            metadata: Dict tambahan (feature_columns, scaler, layer_sizes, dll).
-        """
         data: dict = {
             "model_class": "PrabayarModel",
             "layer_sizes": self.layer_sizes,
             "clip_value": self.clip_value,
-            "weights": self.weights,
-            "biases": self.biases,
+            "weights": [w.tolist() for w in self.weights],
+            "biases": [b.tolist() for b in self.biases],
         }
 
         if metadata is not None:
@@ -390,15 +147,6 @@ class PrabayarModel(NeuralNetwork):
 
     @classmethod
     def load(cls, path: str) -> tuple["PrabayarModel", dict]:
-        """
-        Muat model dari file JSON.
-
-        Args:
-            path: Path file JSON sumber.
-
-        Returns:
-            Tuple (model, metadata).
-        """
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
@@ -406,24 +154,19 @@ class PrabayarModel(NeuralNetwork):
         clip_value: float = data.get("clip_value", 5.0)
 
         model = cls(layer_sizes=layer_sizes, clip_value=clip_value)
-        model.weights = data["weights"]
-        model.biases = data["biases"]
+        model.weights = [np.array(w, dtype=np.float32) for w in data["weights"]]
+        model.biases = [np.array(b, dtype=np.float32) for b in data["biases"]]
 
         metadata: dict = data.get("metadata", {})
         return model, metadata
 
-    # ------------------------------------------------------------------
-    # Override get_summary
-    # ------------------------------------------------------------------
-
     def get_summary(self) -> str:
-        """Ringkasan arsitektur model."""
         total_params = sum(
             self.layer_sizes[l] * self.layer_sizes[l + 1] + self.layer_sizes[l + 1]
             for l in range(self.num_layers - 1)
         )
         return (
-            f"PrabayarModel | Arsitektur: {self.layer_sizes} | "
+            f"PrabayarModel (Vectorized) | Arsitektur: {self.layer_sizes} | "
             f"Total parameter: {total_params:,} | "
             f"Clip value: {self.clip_value}"
         )
