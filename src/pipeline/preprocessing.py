@@ -311,6 +311,49 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     else:
         df["Estimasi_Fisika_Durasi_Hari"] = 0.0
 
+    # If someone refills N times per month, each token lasts ~30/N days
+    # Clip to [1, 60] to avoid division by zero and unrealistic outliers
+    if "Frekuensi_Isi_Token_Per_Bulan" in df.columns:
+        freq = df["Frekuensi_Isi_Token_Per_Bulan"].replace(0, np.nan)
+        df["Durasi_Dari_Frekuensi"] = (30.0 / freq).clip(1, 60)
+        df["Durasi_Dari_Frekuensi"] = df["Durasi_Dari_Frekuensi"].fillna(30.0)
+
+    # Nominal token Rp → kWh → days at current consumption rate
+    # Using survey-based tariff estimate (may differ from physics tariff)
+    if ("Nominal_Token_Terakhir_Rp" in df.columns and 
+        "Estimasi_Tarif_Per_kWh_Rp" in df.columns and
+        "Total_Energi_Semua_kWhPerHari" in df.columns):
+        kwh_beli = df["Nominal_Token_Terakhir_Rp"] / (
+            df["Estimasi_Tarif_Per_kWh_Rp"].replace(0, 1444.70)
+        )
+        df["Rasio_Token_vs_Energi"] = kwh_beli / (
+            df["Total_Energi_Semua_kWhPerHari"] + 0.1
+        )
+
+    if "Nominal_Token_Terakhir_Rp" in df.columns:
+        def kategorikan_nominal(x):
+            if x <= 20_000:   return 0  # very short expected duration
+            if x <= 50_000:   return 1  # short
+            if x <= 100_000:  return 2  # medium
+            if x <= 200_000:  return 3  # long
+            return 4                     # very long
+        df["Token_Nominal_Kategori"] = df["Nominal_Token_Terakhir_Rp"].apply(
+            kategorikan_nominal
+        )
+
+    if ("Total_Energi_Semua_kWhPerHari" in df.columns and 
+        "Nominal_Token_Terakhir_Rp" in df.columns):
+        df["Energi_Per_Nominal"] = (
+            df["Total_Energi_Semua_kWhPerHari"] /
+            (df["Nominal_Token_Terakhir_Rp"] / 1000.0 + 0.01)
+        )
+
+    if ("Estimasi_Fisika_Durasi_Hari" in df.columns and 
+        "Durasi_Dari_Frekuensi" in df.columns):
+        df["Fisika_vs_Frekuensi_Gap"] = (
+            df["Estimasi_Fisika_Durasi_Hari"] - df["Durasi_Dari_Frekuensi"]
+        )
+
     # 2. PASCABAYAR: Estimasi Fisika Tagihan Rp
     #    Total kWh bulanan * Tarif * 1.05 PPJ + 2500 Admin
     if "Total_Energi_Semua_kWhPerBulan" in df.columns:

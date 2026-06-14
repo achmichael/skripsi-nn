@@ -414,6 +414,7 @@ def run_training(model_type: str):
             layer_sizes=layer_sizes,
             seed=42,
             clip_value=cfg["clip_value"],
+            l2_lambda=cfg.get("l2_lambda", 0.0),
         )
 
     # Train

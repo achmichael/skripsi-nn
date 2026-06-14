@@ -1,10 +1,8 @@
 import json
 import math
 import numpy as np
-
 from src.activations.ReLU import relu, relu_derivative
 from src.models.neural_network import NeuralNetwork
-
 
 class PascabayarModel(NeuralNetwork):
     def __init__(
