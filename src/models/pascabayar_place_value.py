@@ -19,7 +19,7 @@ Tetap tidak mengklaim neuron pasti belajar digit satuan-jutaan secara sempurna.
 import json
 import math
 import random
-
+import numpy as np
 from src.activations.ReLU import relu, relu_derivative
 from src.models.neural_network import NeuralNetwork
 
@@ -63,7 +63,7 @@ class PascabayarPlaceValueModel(NeuralNetwork):
         self.component_activation = component_activation
 
         if seed is not None:
-            random.seed(seed)
+            np.random.seed(seed)
 
         # Layer 1: input -> hidden(7)
         self.w1: list[list[float]] = []
