@@ -469,16 +469,12 @@ def run_training(model_type: str):
     print(f"  MAE: {mae_orig:,.4f}")
 
     # Sample predictions
-    print(f"\nContoh prediksi ({cfg['target_label']}):")
-    for i in range(min(10, len(x_test_scaled))):
+    print(f"\n--- Perbandingan Prediksi vs Aktual (15 Data Pertama) [{cfg['target_label']}] ---")
+    for i in range(min(15, len(x_test_scaled))):
         pred = preds_orig[i]
         actual = y_test[i]
-        ratio = pred / actual if actual != 0 else float('inf')
-        print(
-            f"  Data {i + 1}: Prediksi = {pred:,.2f}, "
-            f"Aktual = {actual:,.2f}, "
-            f"Rasio = {ratio:.2f}"
-        )
+        selisih = errors_orig[i]
+        print(f"Data {i+1:2d} | Aktual: {actual:>12,.2f} | Prediksi: {pred:>12,.2f} | Selisih: {selisih:>12,.2f}")
 
     # === Simpan metrics ===
     metrics_dir = cfg["metrics_dir"]
