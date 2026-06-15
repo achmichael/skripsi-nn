@@ -384,6 +384,10 @@ def run_training():
     print(f"  RMSE: {rmse_orig:,.4f}")
     print(f"  MAE: {mae_orig:,.4f}")
 
+    print("\n--- Perbandingan Prediksi vs Aktual (15 Data Pertama) ---")
+    for i in range(min(15, len(y_test))):
+        print(f"Data {i+1:2d} | Aktual: Rp {y_test[i]:>10,.0f} | Prediksi: Rp {preds_orig[i]:>10,.0f} | Selisih: Rp {errors_orig[i]:>10,.0f}")
+
     # Visualisasi dan Metrik
     save_loss_curve(
         history=history,

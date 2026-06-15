@@ -36,7 +36,7 @@ class NeuralNetwork(ABC):
         ...
 
     @abstractmethod
-    def train_batch(
+    def train_batch(    
         self,
         x_batch: np.ndarray,
         y_batch: np.ndarray,

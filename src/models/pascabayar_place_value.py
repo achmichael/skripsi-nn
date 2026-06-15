@@ -1,21 +1,3 @@
-"""
-PascabayarPlaceValueModel
-
-Eksperimen arsitektur Place Value Decomposition Neural Network.
-
-Struktur:
-- Input layer: jumlah fitur final setelah preprocessing
-- Hidden layer: 7 neuron, aktivasi ReLU
-- Output komponen: 7 neuron (komponen kontribusi nilai tempat)
-- Final output: penjumlahan seluruh komponen
-
-Catatan metodologis:
-Model ini eksperimen arsitektur untuk memecah estimasi biaya menjadi 7 komponen
-nilai tempat yang dijumlahkan menjadi prediksi total.
-Model dibatasi skala maksimum tiap komponen agar interpretasi place-value lebih konsisten.
-Tetap tidak mengklaim neuron pasti belajar digit satuan-jutaan secara sempurna.
-"""
-
 import json
 import math
 import random
@@ -23,19 +5,7 @@ import numpy as np
 from src.activations.ReLU import relu, relu_derivative
 from src.models.neural_network import NeuralNetwork
 
-
 class PascabayarPlaceValueModel(NeuralNetwork):
-    """
-    Model NN dengan hidden=7 dan output komponen=7.
-
-    Forward:
-      h = ReLU(XW1 + b1)
-      c = activation(W2h + b2)
-      y_pred = sum(c)
-
-    Loss dihitung terhadap y_pred (bukan loss per-komponen terpisah).
-    """
-
     def __init__(
         self,
         input_size: int,
@@ -144,8 +114,7 @@ class PascabayarPlaceValueModel(NeuralNetwork):
 
     def forward(self, inputs: list[float]) -> float:
         self._x = inputs
-
-        # Hidden layer
+        # Hidden layer pertama
         self._z_hidden = []
         self._h = []
         for j in range(self.hidden_size):
@@ -155,7 +124,7 @@ class PascabayarPlaceValueModel(NeuralNetwork):
             self._z_hidden.append(z)
             self._h.append(relu(z))
 
-        # Komponen output
+        # Komponen output kedua
         self._z_comp = []
         self._sigmoid_comp = []
         self._c = []
@@ -219,13 +188,12 @@ class PascabayarPlaceValueModel(NeuralNetwork):
         comps_rp = self._decompose_rp_to_digit_components(total_rp)
         return self._components_rp_to_normalized(comps_rp)
 
-    def backward(self, target: float, learning_rate: float) -> None:
-        # d(MSE)/dy = 2*(y_pred - y)
-        d_loss_d_y = 2.0 * (self._y_pred - target)
-        d_loss_d_y = self._clip_gradient(d_loss_d_y, self.clip_value)
-
-        # Karena y = sum(c_k), maka dL/dc_k = dL/dy * 1
-        d_loss_d_c = [d_loss_d_y for _ in range(self.num_components)]
+    def backward(self, target_components: list[float], learning_rate: float) -> None:
+        # d(MSE per komponen)/dc_k = 2*(c_k - target_k)
+        d_loss_d_c = []
+        for k in range(self.num_components):
+            grad = 2.0 * (self._c[k] - target_components[k])
+            d_loss_d_c.append(self._clip_gradient(grad, self.clip_value))
 
         # dL/dz_comp_k
         d_loss_d_z_comp = []
@@ -273,10 +241,15 @@ class PascabayarPlaceValueModel(NeuralNetwork):
         target: float,
         learning_rate: float,
     ) -> float:
-        pred = self.forward(inputs)
-        loss = self._mse_loss(pred, target)
-        self.backward(target, learning_rate)
-        return loss
+        self.forward(inputs)
+        target_components = self.decompose_total_to_digit_components(target)
+        
+        # Hitung loss per komponen
+        component_losses = [self._mse_loss(self._c[k], target_components[k]) for k in range(self.num_components)]
+        total_component_loss = sum(component_losses)
+        
+        self.backward(target_components, learning_rate)
+        return total_component_loss
 
     def train_batch(
         self,
@@ -284,7 +257,6 @@ class PascabayarPlaceValueModel(NeuralNetwork):
         y_batch,
         learning_rate: float,
     ) -> float:
-        import numpy as np
         total_loss = 0.0
         n = len(x_batch)
         for i in range(n):
@@ -295,7 +267,6 @@ class PascabayarPlaceValueModel(NeuralNetwork):
         return total_loss / n if n > 0 else 0.0
 
     def predict(self, inputs):
-        import numpy as np
         if isinstance(inputs, np.ndarray) and inputs.ndim == 2:
             return np.array([self.forward(x.tolist()) for x in inputs])
         elif isinstance(inputs, list) and len(inputs) > 0 and isinstance(inputs[0], list):
