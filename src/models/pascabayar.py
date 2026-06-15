@@ -76,6 +76,39 @@ class PascabayarModel(NeuralNetwork):
     ) -> float:
         return self.train_batch(inputs[np.newaxis, :], target[np.newaxis, :], learning_rate)
 
+    def train_batch_weighted(
+        self,
+        x_batch: np.ndarray,
+        y_batch: np.ndarray,
+        learning_rate: float,
+        weights: list[float],
+    ) -> float:
+        """
+        Train one batch with per-sample loss weights.
+        Higher weight = scaled learning rate for that sample.
+
+        Args:
+            x_batch     : list of input samples
+            y_batch     : list of target values (normalized)
+            learning_rate: base learning rate
+            weights     : per-sample weights, same length as x_batch
+
+        Returns:
+            float: mean unweighted loss (for consistent loss tracking)
+        """
+        total_loss = 0.0
+        n = len(x_batch)
+
+        for i in range(n):
+            x_val = x_batch[i]
+            y_val = y_batch[i]
+            # Scale learning rate by sample weight
+            effective_lr = learning_rate * weights[i]
+            total_loss += self.train_one_sample(x_val, y_val, effective_lr)
+
+        # Return UNWEIGHTED mean loss for consistent tracking across runs
+        return total_loss / n if n > 0 else 0.0
+
     def train_batch(
         self,
         x_batch: np.ndarray,

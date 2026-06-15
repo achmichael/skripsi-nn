@@ -431,6 +431,11 @@ def run_training(model_type: str):
         x_val=x_test_scaled,
         y_val=y_test_scaled,
         lr_decay=cfg.get("lr_decay", 0.0),
+        # ── NEW ─────────────────────────────────────────────────
+        use_sample_weights=(model_type == "pascabayar"),
+        y_scaler=y_scaler,
+        use_log=cfg.get("use_log_transform", False),
+        # ────────────────────────────────────────────────────────
     )
     total_epochs = len(history["train_loss"])
     print(f"Training selesai. Total epoch aktual: {total_epochs}")
