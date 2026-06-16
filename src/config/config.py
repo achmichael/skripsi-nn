@@ -4,8 +4,8 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [64, 32],
-        "learning_rate": 0.001,
+        "hidden_layers": [32, 16],
+        "learning_rate": 0.005,
         "patience": 30,
         "min_delta": 1e-5,
         "clip_value": 5.0,

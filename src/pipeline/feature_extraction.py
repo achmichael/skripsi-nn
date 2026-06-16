@@ -41,7 +41,7 @@ def extract_features_and_target(
     if x_df.isna().any().any():
         bad_cols = x_df.columns[x_df.isna().any()].tolist()
         raise ValueError(f"Non-numeric values found in columns: {bad_cols}")
-        
+            
     x_data = x_df.values.tolist()
     y_data = df[target_column].values.tolist()
 
