@@ -4,8 +4,8 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [64, 32],
-        "learning_rate": 0.0005,
+        "hidden_layers": [32,],
+        "learning_rate": 0.005,
         "patience": 25,
         "min_delta": 1e-5,
         "clip_value": 5.0,
@@ -39,7 +39,7 @@ config = {
         "prabayar": [  
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
-            # "Status_Subsidi_Listrik",      # PRUNED: Negative PI
+            "Status_Subsidi_Listrik",
             "Nominal_Token_Terakhir_Rp",
             "Frekuensi_Isi_Token_Per_Bulan",
 
@@ -75,13 +75,13 @@ config = {
             "RiceCooker_Energi_kWhPerHari",
 
             "MesinCuci_Jumlah",
-            # "MesinCuci_Kategori",                    # PRUNED: redundant with FrekuensiPerMinggu
-            # "MesinCuci_EstimasiWattPerUnit",         # PRUNED: zero variance
+            "MesinCuci_Kategori",
+            "MesinCuci_EstimasiWattPerUnit",
             "MesinCuci_EstimasiFrekuensiPerMinggu",
-            # "MesinCuci_EstimasiDurasiSekaliPakaiJam",# PRUNED: zero variance
+            "MesinCuci_EstimasiDurasiSekaliPakaiJam",
             "MesinCuci_Energi_kWhPerHari",
 
-            # "Alat_Lain_Ada",               # PRUNED: Negative PI
+            "Alat_Lain_Ada",
 
             # Alat_Lain_1_Jenis: one-hot nominal (tidak ada urutan antar jenis alat)
             # "Alat_Lain_1_Jenis__Charger HP/perangkat kecil",
@@ -123,7 +123,7 @@ config = {
             # "Alat_Lain_3_EstimasiWatt",
 
             "Total_Energi_Alat_Lain_kWhPerHari",
-            # "Total_Energi_Utama_kWhPerHari",         # PRUNED: redundant with Semua & negative PI
+            "Total_Energi_Utama_kWhPerHari",
             "Total_Energi_Semua_kWhPerHari",
             
             # === ENGINEERED FEATURES ===
@@ -131,11 +131,11 @@ config = {
             "Estimasi_kWh_Didapat",
             "Estimasi_Fisika_Durasi_Hari",
             "Durasi_Dari_Frekuensi",
-            # "Rasio_Token_vs_Energi",       # PRUNED: redundant with Estimasi_Fisika_Durasi_Hari
-            # "Token_Nominal_Kategori",      # PRUNED: redundant with Nominal_Token_Terakhir_Rp
+            "Rasio_Token_vs_Energi",
+            "Token_Nominal_Kategori",
             "Energi_Per_Nominal",
             "Fisika_vs_Frekuensi_Gap",
-            # "Rasio_Fisika_vs_Frekuensi",   # PRUNED: redundant with Fisika_vs_Frekuensi_Gap
+            "Rasio_Fisika_vs_Frekuensi",
         ],
 
         "pascabayar": [

@@ -73,13 +73,13 @@ class PascabayarPlaceValueModel(NeuralNetwork):
             9_000.0 / 1_000_000.0,
             90_000.0 / 1_000_000.0,
             900_000.0 / 1_000_000.0,
-            1_000_000.0 / 1_000_000.0,
+            9_000_000.0 / 1_000_000.0,
         ]
 
         # Aturan konsep digit (rupiah):
         # satuan, puluhan, ratusan, ribuan, puluhan ribu, ratusan ribu, jutaan.
         self.component_places_rp: list[int] = [1, 10, 100, 1_000, 10_000, 100_000, 1_000_000]
-        self.component_max_digits: list[int] = [9, 9, 9, 9, 9, 9, 1]
+        self.component_max_digits: list[int] = [9, 9, 9, 9, 9, 9, 9]
         self.max_representable_rp: int = sum(
             d * p for d, p in zip(self.component_max_digits, self.component_places_rp)
         )
@@ -182,7 +182,7 @@ class PascabayarPlaceValueModel(NeuralNetwork):
 
         Catatan:
         - Prediksi di-round ke rupiah integer dulu.
-        - Nilai di-clip ke rentang representasi model [0, 1_999_999].
+        - Nilai di-clip ke rentang representasi model [0, 9_999_999].
         """
         total_rp = self._normalized_to_rp_int(total_normalized)
         comps_rp = self._decompose_rp_to_digit_components(total_rp)

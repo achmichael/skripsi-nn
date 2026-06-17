@@ -13,7 +13,6 @@ import json
 import math
 import os
 import sys
-import numpy as np
 
 from src.pipeline.preprocessing import (
     load_and_preprocess,
@@ -182,7 +181,6 @@ def analyze(model_type: str):
             f"{r['index']+1:>3} | {r['feature']:<52} | {r['variance']:>14.6f} | "
             f"{r['unique_count']:>6} | {r['abs_correlation']:>10.4f}{flag}"
         )
-
     # ============================================================
     # 4. KORELASI ANTAR FITUR (deteksi multikolinearitas)
     # ============================================================
@@ -232,8 +230,7 @@ def analyze(model_type: str):
         y_test_scaled = transform_target(y_test, y_scaler)
 
         print("Menghitung permutation importance (5 repeats)...")
-        imp_raw = permutation_importance_mse(model, x_test_scaled, y_test_scaled, n_repeats=5)
-        imp = [float(np.squeeze(d)) for d in imp_raw]
+        imp = permutation_importance_mse(model, x_test_scaled, y_test_scaled, n_repeats=5)
 
         imp_results = list(zip(feature_columns, imp))
         imp_results.sort(key=lambda x: x[1], reverse=True)
@@ -241,8 +238,7 @@ def analyze(model_type: str):
         print(f"\n{'Rank':>4} | {'Fitur':<52} | {'ΔMSE':>14}")
         print("─" * 75)
         for rank, (fname, delta) in enumerate(imp_results, 1):
-            max_delta = float(max(i[1] for i in imp_results))
-            bar = "█" * max(1, int(float(delta) / max_delta * 30)) if max_delta > 0 and float(delta) > 0 else ""
+            bar = "█" * max(1, int(delta / max(i[1] for i in imp_results) * 30)) if max(i[1] for i in imp_results) > 0 and delta > 0 else ""
             print(f"{rank:>4} | {fname:<52} | {delta:>14.8f} {bar}")
     else:
         print(f"\n[INFO] Model belum ada di {model_path}, skip permutation importance.")
