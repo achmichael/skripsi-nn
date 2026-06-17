@@ -35,6 +35,25 @@ config = {
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
         "use_log_transform": False,
     },
+    "pascabayar_place_value": {
+        "dataset_path": "data/pascabayar.csv",
+        "model_path": "results/pascabayar_place_value/models/model_pascabayar_place_value.json",
+        "metrics_dir": "results/pascabayar_place_value/metrics",
+        "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
+        # "hidden_layers": [32, 32],
+        "learning_rate": 0.01,
+
+        "patience": 30,
+        "min_delta": 1e-5,
+        "clip_value": 5.0,
+        "batch_size": 16,
+        "l2_lambda": 1e-2,
+        "lr_decay": 0.001,
+        "target_label": "estimasi biaya (Rp)",
+        # "target": "Tagihan_Bulan_Terakhir_Rp",
+        "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
+        "use_log_transform": False,
+    },
     "features": {
         "prabayar": [  
             "Jumlah_Anggota_Keluarga",
@@ -139,6 +158,71 @@ config = {
         ],
 
         "pascabayar": [
+            "Jumlah_Anggota_Keluarga",
+            "Daya_Listrik_Rumah_VA",
+            "Status_Subsidi_Listrik",
+            
+            # --- LEAKAGE DROPPED ---
+            # "Pemakaian_Bulan_Terakhir_kWh" dihapus karena membocorkan target secara langsung
+            # "Pemakaian_Rata_Rata_3Bulan_kWh" dihapus karena korelasinya terlalu tinggi (0.77) dengan target
+            
+            # "Jumlah_Bulan_Tagihan_Terisi" dihapus — ZERO VARIANCE (seluruh data = 3)
+            # "Jumlah_Bulan_kWh_Terisi" dihapus (Korelasi 1.0 dengan Jumlah_Bulan_Tagihan_Terisi)
+            
+            # Tagihan_Relatif_Stabil → cukup 1 kolom (2 kolom one-hot = perfectly complementary)
+            "Tagihan_Relatif_Stabil__Ya, relatif stabil",
+
+            "Kulkas_Jumlah",
+            # "Kulkas_Kategori" dihapus (Korelasi >0.92 dengan Kulkas_EstimasiWattPerUnit)
+            "Kulkas_EstimasiWattPerUnit",
+            "Kulkas_EstimasiJamPerHari",
+            "Kulkas_Energi_kWhPerHari",
+
+            "TV_Jumlah",
+            # "TV_Kategori" dihapus (Korelasi >0.97 dengan TV_EstimasiJamPerHari)
+            "TV_EstimasiJamPerHari",
+            "TV_Energi_kWhPerHari",
+
+            "AC_Jumlah",
+            # "AC_PK_Kategori" dihapus (Korelasi >0.93 dengan AC_EstimasiWattPerUnit)
+            # "AC_Kategori" dihapus (Korelasi >0.96 dengan AC_EstimasiJamPerHari)
+            "AC_EstimasiWattPerUnit",
+            "AC_EstimasiJamPerHari",
+            "AC_Energi_kWhPerHari",
+
+            "Kipas_Jumlah",
+            # "Kipas_Kategori" dihapus (Korelasi >0.97 dengan Kipas_EstimasiJamPerHari)
+            "Kipas_EstimasiJamPerHari",
+            "Kipas_Energi_kWhPerHari",
+
+            "RiceCooker_Jumlah",
+            # "RiceCooker_Kategori" dihapus (Korelasi >0.97 dengan RiceCooker_EstimasiJamPerHari)
+            "RiceCooker_EstimasiJamPerHari",
+            "RiceCooker_Energi_kWhPerHari",
+
+            "MesinCuci_Jumlah",
+            # "MesinCuci_Kategori" dihapus (Korelasi >0.99 dengan MesinCuci_EstimasiFrekuensiPerMinggu)
+            "MesinCuci_EstimasiFrekuensiPerMinggu",
+            "MesinCuci_Energi_kWhPerHari",
+
+            "Alat_Lain_Ada",
+
+            "Total_Energi_Alat_Lain_kWhPerHari",
+            # "Total_Energi_Utama_kWhPerHari" dihapus (Korelasi >0.99 dengan Total_Energi_Semua_kWhPerHari)
+            "Total_Energi_Semua_kWhPerHari",
+
+            "Total_Energi_Semua_kWhPerBulan",
+            "Estimasi_Tarif_Per_kWh_Rp",
+
+            # === ENGINEERED FEATURES ===
+            # Interaksi tarif × konsumsi — sinyal terkuat untuk prediksi biaya
+            "Estimasi_Biaya_Energi_Bulanan_Rp",
+            # Interaksi daya × konsumsi — proxy kapasitas pemakaian sebenarnya  
+            "Daya_x_TotalEnergi",
+            # Estimator biaya berdasarkan aturan PLN + PPJ
+            "Estimasi_Fisika_Tagihan_Rp",
+        ],
+        "pascabayar_place_value": [
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
             "Status_Subsidi_Listrik",

@@ -284,7 +284,7 @@ def plot_error_distribution(
 
 
 def run_training():
-    model_type = "pascabayar"
+    model_type = "pascabayar_place_value"
     cfg = config[model_type]
     
     # Override directories for place value model
