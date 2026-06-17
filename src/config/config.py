@@ -4,13 +4,13 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [32,],
-        "learning_rate": 0.005,
+        "hidden_layers": [39, 32],
+        "learning_rate": 0.05,
         "patience": 25,
         "min_delta": 1e-5,
-        "clip_value": 5.0,
+        "clip_value": 1.0,
         "batch_size": 16,
-        "l2_lambda": 1e-3,         # tambahkan L2 — belum ada di config prabayar!
+        "l2_lambda": 1e-2,         # tambahkan L2 — belum ada di config prabayar!
         "lr_decay": 0.001,         # tambahkan LR decay
         "target_label": "durasi token (hari)",
         "target": "Token_Habis_Dalam_Hari",
