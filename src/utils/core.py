@@ -12,6 +12,7 @@ def compute_sample_weight(
     y_normalized: float,
     y_scaler: dict,
     use_log: bool = False,
+    model_type: str = "pascabayar",
 ) -> float:
     """
     Compute per-sample loss weight based on the original Rupiah value
@@ -34,15 +35,25 @@ def compute_sample_weight(
     Returns:
         float: sample weight >= 1.0
     """
-    # Convert normalized → original Rupiah to determine weight bucket
+    # Convert normalized → original scale (Rupiah for pascabayar, days for prabayar)
     y_original = inverse_transform_target(y_normalized, y_scaler)
 
-    if y_original < 100_000:
-        return 2.0
-    elif y_original < 200_000:
-        return 1.5
-    else:
-        return 1.0
+    if model_type == "pascabayar":
+        if y_original < 100_000:
+            return 2.0
+        elif y_original < 200_000:
+            return 1.5
+        else:
+            return 1.0
+    elif model_type == "prabayar":
+        if y_original <= 10.0:
+            return 2.5
+        elif y_original >= 25.0:
+            return 2.0
+        else:
+            return 1.0
+    
+    return 1.0
 
 def mean_squared_error_single(prediction: float, target: float) -> float:
     error = prediction - target
@@ -83,6 +94,7 @@ def train_model(
     use_sample_weights: bool = False,
     y_scaler: dict | None = None,
     use_log: bool = False,
+    model_type: str = "pascabayar",
     # ────────────────────────────────────────────────────────
 ) -> dict:
     """
@@ -111,13 +123,19 @@ def train_model(
         y_val_np = np.array(y_val, dtype=np.float32).reshape(-1, 1)
 
     if use_sample_weights and y_scaler is not None:
-        w_counts = {1.0: 0, 1.5: 0, 3.0: 0}
+        w_counts = {1.0: 0, 1.5: 0, 2.0: 0, 2.5: 0}
         for y_val_i in y_train:
-            w = compute_sample_weight(float(y_val_i), y_scaler, use_log)
+            w = compute_sample_weight(float(y_val_i), y_scaler, use_log, model_type)
             w_counts[w] = w_counts.get(w, 0) + 1
-        print(f"[Sample Weights] weight=3.0 (< 100rb) : {w_counts.get(3.0, 0)} samples")
-        print(f"[Sample Weights] weight=1.5 (< 200rb) : {w_counts.get(1.5, 0)} samples")
-        print(f"[Sample Weights] weight=1.0 (>= 200rb): {w_counts.get(1.0, 0)} samples")
+            
+        if model_type == "pascabayar":
+            print(f"[Sample Weights] weight=2.0 (< 100rb) : {w_counts.get(2.0, 0)} samples")
+            print(f"[Sample Weights] weight=1.5 (< 200rb) : {w_counts.get(1.5, 0)} samples")
+            print(f"[Sample Weights] weight=1.0 (>= 200rb): {w_counts.get(1.0, 0)} samples")
+        else:
+            print(f"[Sample Weights] weight=2.5 (<= 10 hari) : {w_counts.get(2.5, 0)} samples")
+            print(f"[Sample Weights] weight=2.0 (>= 25 hari) : {w_counts.get(2.0, 0)} samples")
+            print(f"[Sample Weights] weight=1.0 (normal) : {w_counts.get(1.0, 0)} samples")
 
     while True:
         epoch += 1
@@ -148,6 +166,7 @@ def train_model(
                         y_normalized=float(y_val_i.item()),
                         y_scaler=y_scaler,
                         use_log=use_log,
+                        model_type=model_type,
                     )
                     for y_val_i in y_batch
                 ]

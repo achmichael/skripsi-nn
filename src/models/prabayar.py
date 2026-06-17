@@ -85,13 +85,12 @@ class PrabayarModel(NeuralNetwork):
         # Konversi ke bentuk batch berukuran 1
         return self.train_batch(inputs[np.newaxis, :], target[np.newaxis, :], learning_rate)
 
-    def train_batch(
+    def train_batch_weighted(
         self,
         x_batch: np.ndarray,
         y_batch: np.ndarray,
         learning_rate: float,
-        y_min: float | None = None,
-        y_max: float | None = None,
+        weights: list[float],
     ) -> float:
         batch_size = x_batch.shape[0]
 
@@ -100,22 +99,13 @@ class PrabayarModel(NeuralNetwork):
         if y_batch.ndim == 1:
             y_batch = y_batch.reshape(-1, 1)
 
-        if y_min is not None and y_max is not None:
-            short_thresh_norm = (10.0 - y_min) / (y_max - y_min + 1e-8)
-            long_thresh_norm  = (25.0 - y_min) / (y_max - y_min + 1e-8)
-            
-            weights = np.ones_like(y_batch)
-            weights[y_batch <= short_thresh_norm] = 2.5
-            weights[y_batch >= long_thresh_norm] = 2.0
-            
-            squared_errors = (prediction - y_batch) ** 2
-            total_loss = float(np.mean(weights * squared_errors))
-            
-            # Weighted gradient
-            output_grad = 2.0 * weights * (prediction - y_batch) / batch_size
-        else:
-            total_loss = self._mse_loss(prediction, y_batch)
-            output_grad = 2.0 * (prediction - y_batch) / batch_size
+        w_np = np.array(weights, dtype=np.float32).reshape(-1, 1)
+
+        squared_errors = (prediction - y_batch) ** 2
+        total_loss = float(np.mean(w_np * squared_errors))
+        
+        # Weighted gradient
+        output_grad = 2.0 * w_np * (prediction - y_batch) / batch_size
 
         # 2. Backward pass
         output_grad = self._clip_gradient(output_grad, self.clip_value)
@@ -136,6 +126,52 @@ class PrabayarModel(NeuralNetwork):
             inputs_l = self._activations[l] # shape: (batch_size, fan_in)
             
             # gradient weights shape: (fan_out, fan_in)
+            grad_w = np.dot(deltas[l].T, inputs_l)
+            
+            if self.l2_lambda > 0:
+                grad_w += self.l2_lambda * self.weights[l]
+                
+            grad_b = np.sum(deltas[l], axis=0)
+
+            self.weights[l] -= learning_rate * grad_w
+            self.biases[l] -= learning_rate * grad_b
+
+        # Mengembalikan unweighted loss agar grafik loss konsisten
+        unweighted_loss = self._mse_loss(prediction, y_batch)
+        return float(unweighted_loss)
+
+    def train_batch(
+        self,
+        x_batch: np.ndarray,
+        y_batch: np.ndarray,
+        learning_rate: float,
+    ) -> float:
+        batch_size = x_batch.shape[0]
+
+        # 1. Forward pass
+        prediction = self.forward(x_batch) # shape: (batch_size, 1)
+        if y_batch.ndim == 1:
+            y_batch = y_batch.reshape(-1, 1)
+
+        total_loss = self._mse_loss(prediction, y_batch)
+        output_grad = 2.0 * (prediction - y_batch) / batch_size
+
+        # 2. Backward pass
+        output_grad = self._clip_gradient(output_grad, self.clip_value)
+
+        deltas = [None] * (self.num_layers - 1)
+        deltas[-1] = output_grad
+
+        # Hidden layers gradient
+        for l in range(self.num_layers - 3, -1, -1):
+            grad = np.dot(deltas[l + 1], self.weights[l + 1]) 
+            grad *= relu_derivative(self._pre_activations[l])
+            deltas[l] = self._clip_gradient(grad, self.clip_value)
+
+        # 3. Update bobot dan bias
+        for l in range(self.num_layers - 1):
+            inputs_l = self._activations[l] 
+            
             grad_w = np.dot(deltas[l].T, inputs_l)
             
             if self.l2_lambda > 0:
