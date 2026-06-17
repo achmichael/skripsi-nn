@@ -364,6 +364,7 @@ def run_training(model_type: str):
     os.makedirs(cfg["metrics_dir"], exist_ok=True)
 
     print(f"=== Training model {model_type.upper()} ===\n")
+    print(f"[INFO] Log transform: {cfg.get('use_log_transform', False)}")
 
     # Load & encode
     rows = load_and_preprocess(cfg["dataset_path"])

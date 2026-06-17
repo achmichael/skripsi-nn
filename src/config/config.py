@@ -4,7 +4,7 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [32, 16],
+        "hidden_layers": [64, 32, 16],
         "learning_rate": 0.005,
         "patience": 30,
         "min_delta": 1e-5,
@@ -13,7 +13,8 @@ config = {
         "l2_lambda": 1e-3,         # tambahkan L2 — belum ada di config prabayar!
         "lr_decay": 0.001,         # tambahkan LR decay
         "target_label": "durasi token (hari)",
-        "target": "Token_Habis_Dalam_Hari" 
+        "target": "Token_Habis_Dalam_Hari",
+        "use_log_transform": True,
     },
     "pascabayar": {
         "dataset_path": "data/pascabayar.csv",
@@ -134,6 +135,7 @@ config = {
             "Token_Nominal_Kategori",
             "Energi_Per_Nominal",
             "Fisika_vs_Frekuensi_Gap",
+            "Rasio_Fisika_vs_Frekuensi",
         ],
 
         "pascabayar": [
@@ -260,6 +262,7 @@ config = {
         "Token_Nominal_Kategori",
         "Energi_Per_Nominal",
         "Fisika_vs_Frekuensi_Gap",
+        "Rasio_Fisika_vs_Frekuensi",
         "Estimasi_Fisika_Tagihan_Rp",
     ],
     # Ordinal encoding: maps categorical string -> numeric value

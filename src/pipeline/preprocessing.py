@@ -353,6 +353,8 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
         df["Fisika_vs_Frekuensi_Gap"] = (
             df["Estimasi_Fisika_Durasi_Hari"] - df["Durasi_Dari_Frekuensi"]
         )
+        df["Rasio_Fisika_vs_Frekuensi"] = df["Estimasi_Fisika_Durasi_Hari"] / (df["Durasi_Dari_Frekuensi"] + 1e-8)
+        df["Rasio_Fisika_vs_Frekuensi"] = df["Rasio_Fisika_vs_Frekuensi"].clip(0.1, 10.0)
 
     # 2. PASCABAYAR: Estimasi Fisika Tagihan Rp
     #    Total kWh bulanan * Tarif * 1.05 PPJ + 2500 Admin
@@ -525,7 +527,7 @@ def transform_minmax(x_data: list[list[float]], scaler: dict) -> list[list[float
 def fit_target_scaler(y_data: list[float], use_log: bool = False) -> dict:
     """Fit MinMax scaler on target values, optionally with log-transform."""
     if use_log:
-        y_transformed = [math.log(y) for y in y_data]
+        y_transformed = [float(np.log1p(y)) for y in y_data]
     else:
         y_transformed = y_data
 
@@ -545,7 +547,7 @@ def transform_target(y_data: list[float], scaler: dict) -> list[float]:
     scaled = []
 
     for value in y_data:
-        v = math.log(value) if use_log else value
+        v = float(np.log1p(value)) if use_log else value
 
         if max_value == min_value:
             scaled.append(0.0)
@@ -560,6 +562,6 @@ def inverse_transform_target(value: float, scaler: dict) -> float:
     raw = value * (scaler["max"] - scaler["min"]) + scaler["min"]
 
     if scaler.get("use_log", False):
-        return math.exp(raw)
+        return float(np.expm1(raw))
 
     return raw
