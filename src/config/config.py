@@ -45,9 +45,12 @@ config = {
 
         "patience": 30,
         "min_delta": 1e-5,
+        # nilai threshold maksimal untuk pembaruan gradient selama proses backpropagation, karena terkadang nilai gradien bisa sangat besar secara tiba tiba (exploding gradient)
         "clip_value": 5.0,
         "batch_size": 16,
-        "l2_lambda": 1e-2,
+        # nilai penalti untuk bobot yang terlalu besar
+        "l2_lambda": 0.01,
+        # nilai pengurangan learning rate
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
         # "target": "Tagihan_Bulan_Terakhir_Rp",
