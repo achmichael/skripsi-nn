@@ -329,7 +329,6 @@ def run_training():
     model = PascabayarPlaceValueModel(
         input_size=input_size,
         hidden_size=7,
-        num_components=7,
         seed=42,
         clip_value=cfg["clip_value"],
         l2_lambda=cfg.get("l2_lambda", 0.0),
@@ -413,7 +412,7 @@ def run_training():
 
     metrics_data = {
         "model_type": "pascabayar_place_value",
-        "arsitektur": [input_size, 7, 7],
+        "arsitektur": [input_size, 7, 1],
         "learning_rate": cfg["learning_rate"],
         "total_epochs": total_epochs,
         "final_train_loss": history["train_loss"][-1] if history["train_loss"] else None,
