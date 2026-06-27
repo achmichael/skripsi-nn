@@ -188,16 +188,22 @@ def get_mlp_grid(n_features: int) -> list[dict]:
     """Generate hyperparameter grid for MLP models."""
     param_grid = {
         "layer_sizes": [
+            # Shallow Architectures
             [n_features, 32, 1],
             [n_features, 64, 1],
+            [n_features, 128, 1],
+            # Medium Deep Architectures
             [n_features, 64, 32, 1],
             [n_features, 128, 64, 1],
+            # Deep Architectures
+            [n_features, 128, 64, 32, 1],
+            [n_features, 256, 128, 64, 1],
         ],
-        "learning_rate": [0.001, 0.005, 0.01, 0.05],
-        "l2_lambda": [0.0, 1e-4, 1e-3],
-        "clip_value": [1.0, 5.0, 10.0],
-        "epochs": [100, 200, 500],
-        "batch_size": [16, 32, 64],
+        "learning_rate": [1e-4, 5e-4, 1e-3, 5e-3, 1e-2],
+        "l2_lambda": [0.0, 1e-5, 1e-4, 1e-3, 1e-2],
+        "clip_value": [1.0, 3.0, 5.0, 10.0],
+        "epochs": [100, 200, 300, 500],
+        "batch_size": [16, 32, 64, 128],
     }
 
     keys = list(param_grid.keys())
@@ -209,11 +215,11 @@ def get_pv_grid() -> list[dict]:
     """Generate hyperparameter grid for PascabayarPlaceValueModel."""
     param_grid = {
         "component_activation": ["relu", "linear"],
-        "learning_rate": [0.001, 0.005, 0.01, 0.05],
-        "l2_lambda": [0.0, 1e-4, 1e-3],
-        "clip_value": [1.0, 5.0, 10.0],
-        "epochs": [100, 200, 500],
-        "batch_size": [16, 32, 64],
+        "learning_rate": [1e-4, 5e-4, 1e-3, 5e-3, 1e-2],
+        "l2_lambda": [0.0, 1e-5, 1e-4, 1e-3, 1e-2],
+        "clip_value": [1.0, 3.0, 5.0, 10.0],
+        "epochs": [100, 200, 300, 500],
+        "batch_size": [16, 32, 64, 128],
     }
 
     keys = list(param_grid.keys())
