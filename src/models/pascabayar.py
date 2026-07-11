@@ -120,7 +120,6 @@ class PascabayarModel(NeuralNetwork):
         learning_rate: float,
     ) -> float:
         batch_size = x_batch.shape[0]
-
         prediction = self.forward(x_batch)
         if y_batch.ndim == 1:
             y_batch = y_batch.reshape(-1, 1)

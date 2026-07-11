@@ -4,9 +4,9 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [39, 32],
-        "learning_rate": 0.05,
-        "patience": 5,
+        "hidden_layers": [64, 32],
+        "learning_rate": 0.01,
+        "patience": 8,
         "min_delta": 1e-5,
         "clip_value": 1.0,
         "batch_size": 16,
@@ -23,7 +23,7 @@ config = {
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
         "hidden_layers": [32, 32],
         "learning_rate": 0.05,            
-        "patience": 5,
+        "patience": 8,
         "min_delta": 1e-5,
         "clip_value": 1.0,
         "batch_size": 16,
@@ -48,13 +48,13 @@ config = {
         "clip_value": 1.0,
         "batch_size": 16,
         # nilai penalti untuk bobot yang terlalu besar
-        "l2_lambda": 0.0001,
+        "l2_lambda": 0.001,
         # nilai pengurangan learning rate
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
         # "target": "Tagihan_Bulan_Terakhir_Rp",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
-        "use_log_transform": True,
+        "use_log_transform": False,
     },
     "features": {
         "prabayar": [  
