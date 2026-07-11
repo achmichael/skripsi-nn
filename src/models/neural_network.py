@@ -60,7 +60,7 @@ class NeuralNetwork(ABC):
     @staticmethod
     def _mse_loss(prediction: np.ndarray, target: np.ndarray) -> float:
         error = prediction - target
-        return float(np.mean(error ** 2))
+        return float(np.mean(error ** 2) / 2.0)
 
     @staticmethod
     def _he_init(fan_in: int, seed: int | None = None) -> float:

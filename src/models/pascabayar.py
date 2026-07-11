@@ -126,28 +126,38 @@ class PascabayarModel(NeuralNetwork):
 
         total_loss = self._mse_loss(prediction, y_batch)
 
-        output_grad = 2.0 * (prediction - y_batch) / batch_size
-        output_grad = self._clip_gradient(output_grad, self.clip_value)
+        # δ_out = (1/m)(ŷ − y) — tanpa faktor 2, konsisten dengan L = (1/(2m))Σ(ŷ−y)²
+        output_grad = (prediction - y_batch) / batch_size
 
         deltas = [None] * (self.num_layers - 1)
         deltas[-1] = output_grad
 
+        # Hidden layer deltas — tanpa clipping pada delta
         for l in range(self.num_layers - 3, -1, -1):
             grad = np.dot(deltas[l + 1], self.weights[l + 1])
             grad *= relu_derivative(self._pre_activations[l])
-            deltas[l] = self._clip_gradient(grad, self.clip_value)
+            deltas[l] = grad
 
+        # Update weight dan bias
         for l in range(self.num_layers - 1):
             inputs_l = self._activations[l]
             
             grad_w = np.dot(deltas[l].T, inputs_l)
-            if self.l2_lambda > 0:
-                grad_w += self.l2_lambda * self.weights[l]
-                
-            grad_b = np.sum(deltas[l], axis=0)
 
+            # L2 regularization: Grad += (λ/m)W — setelah gradien dihitung
+            if self.l2_lambda > 0:
+                grad_w += (self.l2_lambda / batch_size) * self.weights[l]
+
+            # Gradient clipping — setelah L2, pada gradien weight
+            grad_w = self._clip_gradient(grad_w, self.clip_value)
+                
             self.weights[l] -= learning_rate * grad_w
-            self.biases[l] -= learning_rate * grad_b
+
+            # Bias update — skip output layer (output layer tidak punya bias)
+            if l < self.num_layers - 2:
+                grad_b = np.sum(deltas[l], axis=0)
+                grad_b = self._clip_gradient(grad_b, self.clip_value)
+                self.biases[l] -= learning_rate * grad_b
 
         return float(total_loss)
 
