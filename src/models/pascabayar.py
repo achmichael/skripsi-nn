@@ -88,30 +88,61 @@ class PascabayarModel(NeuralNetwork):
         weights: list[float],
     ) -> float:
         """
-        Train one batch with per-sample loss weights.
-        Higher weight = scaled learning rate for that sample.
+        Train one batch with per-sample loss weights (vectorized mini-batch).
 
         Args:
-            x_batch     : list of input samples
-            y_batch     : list of target values (normalized)
-            learning_rate: base learning rate
-            weights     : per-sample weights, same length as x_batch
+            x_batch       : input samples, shape (batch_size, n_features)
+            y_batch       : target values, shape (batch_size, 1) or (batch_size,)
+            learning_rate : base learning rate
+            weights       : per-sample weights, same length as x_batch
 
         Returns:
             float: mean unweighted loss (for consistent loss tracking)
         """
-        total_loss = 0.0
-        n = len(x_batch)
+        batch_size = x_batch.shape[0]
+        prediction = self.forward(x_batch)
+        if y_batch.ndim == 1:
+            y_batch = y_batch.reshape(-1, 1)
 
-        for i in range(n):
-            x_val = x_batch[i]
-            y_val = y_batch[i]
-            # Scale learning rate by sample weight
-            effective_lr = learning_rate * weights[i]
-            total_loss += self.train_one_sample(x_val, y_val, effective_lr)
+        w_np = np.array(weights, dtype=np.float32).reshape(-1, 1)
 
-        # Return UNWEIGHTED mean loss for consistent tracking across runs
-        return total_loss / n if n > 0 else 0.0
+        # Unweighted loss for consistent tracking
+        unweighted_loss = self._mse_loss(prediction, y_batch)
+
+        # Weighted output gradient: (1/m) * w_i * (ŷ_i − y_i)
+        output_grad = w_np * (prediction - y_batch) / batch_size
+
+        deltas = [None] * (self.num_layers - 1)
+        deltas[-1] = output_grad
+
+        # Hidden layer deltas
+        for l in range(self.num_layers - 3, -1, -1):
+            grad = np.dot(deltas[l + 1], self.weights[l + 1])
+            grad *= relu_derivative(self._pre_activations[l])
+            deltas[l] = grad
+
+        # Update weight dan bias
+        for l in range(self.num_layers - 1):
+            inputs_l = self._activations[l]
+
+            grad_w = np.dot(deltas[l].T, inputs_l)
+
+            # L2 regularization: Grad += (λ/m)W
+            if self.l2_lambda > 0:
+                grad_w += (self.l2_lambda / batch_size) * self.weights[l]
+
+            # Gradient clipping — setelah L2
+            grad_w = self._clip_gradient(grad_w, self.clip_value)
+
+            self.weights[l] -= learning_rate * grad_w
+
+            # Bias update — skip output layer
+            if l < self.num_layers - 2:
+                grad_b = np.sum(deltas[l], axis=0)
+                grad_b = self._clip_gradient(grad_b, self.clip_value)
+                self.biases[l] -= learning_rate * grad_b
+
+        return float(unweighted_loss)
 
     def train_batch(
         self,

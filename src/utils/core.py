@@ -185,7 +185,7 @@ def train_model(
         if has_val:
             # Vectorized validation prediction
             val_preds = model.predict(X_val_np)
-            avg_val_loss = float(np.mean((val_preds - y_val_np) ** 2))
+            avg_val_loss = float(np.mean((val_preds - y_val_np) ** 2) / 2.0)
             val_loss_history.append(avg_val_loss)
             val_info = f" | Val Loss: {avg_val_loss:.8f}"
         else:

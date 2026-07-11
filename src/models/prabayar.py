@@ -63,10 +63,10 @@ class PrabayarModel(NeuralNetwork):
             # W shape: (fan_out, fan_in)
             # W.T shape: (fan_in, fan_out)
             # z shape: (batch_size, fan_out)
-            # if is_output_layer:
-                # z = np.dot(current, self.weights[l].T)
-            # else:
-            z = np.dot(current, self.weights[l].T) + self.biases[l]
+            if is_output_layer:
+                z = np.dot(current, self.weights[l].T)
+            else:
+                z = np.dot(current, self.weights[l].T) + self.biases[l]
             
             self._pre_activations.append(z)
             
