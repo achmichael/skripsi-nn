@@ -15,6 +15,7 @@ config = {
         "target_label": "durasi token (hari)",
         "target": "Token_Habis_Dalam_Hari",
         "use_log_transform": True,
+        "asymmetric_alpha": 0.6,
     },
     "pascabayar": {
         "dataset_path": "data/pascabayar.csv",
@@ -30,7 +31,6 @@ config = {
         "l2_lambda": 1e-3,
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
-        # "target": "Tagihan_Bulan_Terakhir_Rp",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
         "use_log_transform": False,
     },
@@ -52,7 +52,6 @@ config = {
         # nilai pengurangan learning rate
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
-        # "target": "Tagihan_Bulan_Terakhir_Rp",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
         "use_log_transform": False,
     },

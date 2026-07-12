@@ -6,8 +6,8 @@ from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 from src.pipeline.preprocessing import (
     load_and_preprocess,
     train_test_split,
-    fit_minmax_scaler,
-    transform_minmax,
+    fit_standard_scaler,
+    transform_standard_scaler,
 )
 from src.pipeline.feature_extraction import extract_features_and_target
 from src.config.config import config
@@ -31,10 +31,10 @@ def benchmark_model(model_type):
         seed=42,
     )
     
-    # 4. Scaling Fitur (Menggunakan scaler manual yang ada)
-    x_scaler = fit_minmax_scaler(x_train)
-    x_train_scaled = transform_minmax(x_train, x_scaler)
-    x_test_scaled = transform_minmax(x_test, x_scaler)
+    # 4. Scaling Fitur (Menggunakan StandardScaler)
+    x_scaler = fit_standard_scaler(x_train)
+    x_train_scaled = transform_standard_scaler(x_train, x_scaler)
+    x_test_scaled = transform_standard_scaler(x_test, x_scaler)
     
     # 5. Scaling Target 
     # Untuk pascabayar nilainya sangat besar (Rupiah), kita scale down agar model scikit-learn konvergen dengan baik,
