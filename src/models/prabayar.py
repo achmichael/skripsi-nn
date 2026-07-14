@@ -63,10 +63,10 @@ class PrabayarModel(NeuralNetwork):
             # W shape: (fan_out, fan_in)
             # W.T shape: (fan_in, fan_out)
             # z shape: (batch_size, fan_out)
-            # if is_output_layer:
-                # z = np.dot(current, self.weights[l].T)
-            # else:
-            z = np.dot(current, self.weights[l].T) + self.biases[l]
+            if is_output_layer:
+                z = np.dot(current, self.weights[l].T)
+            else:
+                z = np.dot(current, self.weights[l].T) + self.biases[l]
             
             self._pre_activations.append(z)
             
@@ -107,22 +107,20 @@ class PrabayarModel(NeuralNetwork):
         squared_errors = (prediction - y_batch) ** 2
         total_loss = float(np.mean(w_np * squared_errors))
         
-        # Weighted gradient
-        output_grad = 2.0 * w_np * (prediction - y_batch) / batch_size
+        # Weighted gradient — tanpa faktor 2, konsisten dengan L = (1/(2m))Σ(ŷ−y)²
+        output_grad = w_np * (prediction - y_batch) / batch_size
 
         # 2. Backward pass
-        output_grad = self._clip_gradient(output_grad, self.clip_value)
-
         deltas = [None] * (self.num_layers - 1)
         deltas[-1] = output_grad
 
-        # Hidden layers gradient
+        # Hidden layer deltas — tanpa clipping pada delta
         for l in range(self.num_layers - 3, -1, -1):
             # deltas[l+1] shape: (batch_size, fan_out_next)
             # weights[l+1] shape: (fan_out_next, fan_out_curr)
             grad = np.dot(deltas[l + 1], self.weights[l + 1]) # shape: (batch_size, fan_out_curr)
             grad *= relu_derivative(self._pre_activations[l])
-            deltas[l] = self._clip_gradient(grad, self.clip_value)
+            deltas[l] = grad
 
         # 3. Update bobot dan bias
         for l in range(self.num_layers - 1):
@@ -131,13 +129,20 @@ class PrabayarModel(NeuralNetwork):
             # gradient weights shape: (fan_out, fan_in)
             grad_w = np.dot(deltas[l].T, inputs_l)
             
+            # L2 regularization: Grad += (λ/m)W
             if self.l2_lambda > 0:
-                grad_w += self.l2_lambda * self.weights[l]
-                
-            grad_b = np.sum(deltas[l], axis=0)
+                grad_w += (self.l2_lambda / batch_size) * self.weights[l]
 
+            # Gradient clipping — setelah L2, pada gradien weight
+            grad_w = self._clip_gradient(grad_w, self.clip_value)
+                
             self.weights[l] -= learning_rate * grad_w
-            self.biases[l] -= learning_rate * grad_b
+
+            # Bias update — skip output layer (output layer tidak punya bias)
+            if l < self.num_layers - 2:
+                grad_b = np.sum(deltas[l], axis=0)
+                grad_b = self._clip_gradient(grad_b, self.clip_value)
+                self.biases[l] -= learning_rate * grad_b
 
         # Mengembalikan unweighted loss agar grafik loss konsisten
         unweighted_loss = self._mse_loss(prediction, y_batch)
@@ -157,19 +162,19 @@ class PrabayarModel(NeuralNetwork):
             y_batch = y_batch.reshape(-1, 1)
 
         total_loss = self._mse_loss(prediction, y_batch)
-        output_grad = 2.0 * (prediction - y_batch) / batch_size
+
+        # δ_out = (1/m)(ŷ − y) — tanpa faktor 2, konsisten dengan L = (1/(2m))Σ(ŷ−y)²
+        output_grad = (prediction - y_batch) / batch_size
 
         # 2. Backward pass
-        output_grad = self._clip_gradient(output_grad, self.clip_value)
-
         deltas = [None] * (self.num_layers - 1)
         deltas[-1] = output_grad
 
-        # Hidden layers gradient
+        # Hidden layer deltas — tanpa clipping pada delta
         for l in range(self.num_layers - 3, -1, -1):
             grad = np.dot(deltas[l + 1], self.weights[l + 1]) 
             grad *= relu_derivative(self._pre_activations[l])
-            deltas[l] = self._clip_gradient(grad, self.clip_value)
+            deltas[l] = grad
 
         # 3. Update bobot dan bias
         for l in range(self.num_layers - 1):
@@ -177,13 +182,20 @@ class PrabayarModel(NeuralNetwork):
             
             grad_w = np.dot(deltas[l].T, inputs_l)
             
+            # L2 regularization: Grad += (λ/m)W — setelah gradien dihitung
             if self.l2_lambda > 0:
-                grad_w += self.l2_lambda * self.weights[l]
-                
-            grad_b = np.sum(deltas[l], axis=0)
+                grad_w += (self.l2_lambda / batch_size) * self.weights[l]
 
+            # Gradient clipping — setelah L2, pada gradien weight
+            grad_w = self._clip_gradient(grad_w, self.clip_value)
+                
             self.weights[l] -= learning_rate * grad_w
-            self.biases[l] -= learning_rate * grad_b
+
+            # Bias update — skip output layer (output layer tidak punya bias)
+            if l < self.num_layers - 2:
+                grad_b = np.sum(deltas[l], axis=0)
+                grad_b = self._clip_gradient(grad_b, self.clip_value)
+                self.biases[l] -= learning_rate * grad_b
 
         return float(total_loss)
 

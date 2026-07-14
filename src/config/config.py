@@ -23,7 +23,7 @@ config = {
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
         "hidden_layers": [32, 32],
         "learning_rate": 0.05,            
-        "patience": 8,
+        "patience": 10,
         "min_delta": 1e-5,
         "clip_value": 1.0,
         "batch_size": 16,

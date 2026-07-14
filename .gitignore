@@ -3,3 +3,4 @@ venv/
 __pycache__/
 model_*.json
 results/
+*.md
