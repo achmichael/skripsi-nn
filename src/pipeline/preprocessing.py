@@ -147,26 +147,60 @@ def manual_mode(series: pd.Series):
     return max(counts, key=counts.get)
 
 
+def fit_minmax(series: pd.Series) -> tuple[float, float]:
+    """
+    Computes min and max for scaling from training data.
+    """
+    x_min = float(series.min())
+    x_max = float(series.max())
+    return x_min, x_max
+
+def apply_minmax(series: pd.Series, min_val: float, max_val: float) -> pd.Series:
+    """
+    Applies min-max scaling using pre-computed parameters.
+    """
+    if max_val == min_val:
+        return pd.Series(np.zeros(len(series)), index=series.index, dtype=float)
+    return (series - min_val) / (max_val - min_val)
+
 def manual_minmax(series: pd.Series) -> pd.Series:
     """
     Min-Max scaling manual: X_scaled = (X - X_min) / (X_max - X_min).
     Jika X_max == X_min → return 0.0 (constant column).
     """
-    x_min = series.min()
-    x_max = series.max()
-    if x_max == x_min:
-        return pd.Series(np.zeros(len(series)), index=series.index, dtype=float)
-    return (series - x_min) / (x_max - x_min)
+    x_min, x_max = fit_minmax(series)
+    return apply_minmax(series, x_min, x_max)
 
 
 # =====================================================================
 # MAIN PREPROCESSING
 # =====================================================================
 
-def preprocess(df: pd.DataFrame) -> pd.DataFrame:
+OHE_FIXED_CATEGORIES = {
+    "Sumber_Angka_Tagihan": [
+        "Melihat bukti pembayaran / struk",
+        "Melihat rekening listrik / PLN Mobile",
+        "Mengingat dari pembayaran terakhir",
+        "Perkiraan kasar",
+    ],
+    "Tagihan_Relatif_Stabil": [
+        "Tidak tahu",
+        "Tidak, sering berubah",
+        "Ya, relatif stabil",
+    ]
+}
+
+def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.DataFrame, dict]:
     """
     Full preprocessing pipeline. Menerima DataFrame mentah dari CSV,
     mengembalikan DataFrame bersih siap untuk feature extraction.
+
+    Contoh penggunaan:
+      # Training:
+      df_train, train_scaler = preprocess(df_train, scaler_params=None)
+      
+      # Inference/Test:
+      df_test, _ = preprocess(df_test, scaler_params=train_scaler)
 
     Steps:
       1. Missing value: "Tidak tahu"/"Tidak diisi" → NaN → imputasi modus.
@@ -174,6 +208,8 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
       3. One-Hot Encoding Sumber_Angka_Tagihan & Tagihan_Relatif_Stabil.
       4. Ordinal encoding rapat (0-based, no gap).
       5. Min-Max scaling pada kolom ordinal.
+      6. Feature Engineering.
+      7. Min-Max scaling pada numeric features dengan scaler parameter.
     """
     df = df.copy()
 
@@ -219,8 +255,8 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
         if col not in df.columns:
             continue
 
-        # Dapatkan unique categories (sorted agar konsisten)
-        categories = sorted(df[col].dropna().unique())
+        # BUG 1 Fix: Use hardcoded deterministic categories
+        categories = OHE_FIXED_CATEGORIES.get(col, sorted(df[col].dropna().unique()))
 
         # Buat binary columns manual
         for cat in categories:
@@ -251,10 +287,12 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
     # Fungsi pembantu untuk menghitung tarif eksak PLN
     def hitung_tarif(row):
         daya = row.get("Daya_Listrik_Rumah_VA", 900)
-        subsidi = row.get("Status_Subsidi_Listrik", 1.0) # 0.0 = Subsidi, 1.0 = Non Subsidi
+        # BUG 3 Fix: Compare raw string instead of float mapping
+        raw_subsidi = row.get("Status_Subsidi_Listrik", "")
+        is_subsidi = str(raw_subsidi).strip().lower() == "subsidi"
         
         if daya <= 450: return 415.0
-        if daya == 900: return 605.0 if subsidi == 0.0 else 1352.0
+        if daya == 900: return 605.0 if is_subsidi else 1352.0
         if daya in [1300, 2200]: return 1444.70
         if daya > 2200: return 1699.53
         return 1444.70 # Default
@@ -272,6 +310,51 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
         df["Estimasi_Fisika_Durasi_Hari"] = df["Estimasi_kWh_Didapat"] / (df["Total_Energi_Semua_kWhPerHari"] + 0.1)
     else:
         df["Estimasi_Fisika_Durasi_Hari"] = 0.0
+
+    # If someone refills N times per month, each token lasts ~30/N days
+    # Clip to [1, 60] to avoid division by zero and unrealistic outliers
+    if "Frekuensi_Isi_Token_Per_Bulan" in df.columns:
+        freq = df["Frekuensi_Isi_Token_Per_Bulan"].replace(0, np.nan)
+        df["Durasi_Dari_Frekuensi"] = (30.0 / freq).clip(1, 60)
+        df["Durasi_Dari_Frekuensi"] = df["Durasi_Dari_Frekuensi"].fillna(30.0)
+
+    # Nominal token Rp → kWh → days at current consumption rate
+    # Using survey-based tariff estimate (may differ from physics tariff)
+    if ("Nominal_Token_Terakhir_Rp" in df.columns and 
+        "Estimasi_Tarif_Per_kWh_Rp" in df.columns and
+        "Total_Energi_Semua_kWhPerHari" in df.columns):
+        kwh_beli = df["Nominal_Token_Terakhir_Rp"] / (
+            df["Estimasi_Tarif_Per_kWh_Rp"].replace(0, 1444.70)
+        )
+        df["Rasio_Token_vs_Energi"] = kwh_beli / (
+            df["Total_Energi_Semua_kWhPerHari"] + 0.1
+        )
+
+    if "Nominal_Token_Terakhir_Rp" in df.columns:
+        def kategorikan_nominal(x):
+            if x <= 20_000:   return 0  # very short expected duration
+            if x <= 50_000:   return 1  # short
+            if x <= 100_000:  return 2  # medium
+            if x <= 200_000:  return 3  # long
+            return 4                     # very long
+        df["Token_Nominal_Kategori"] = df["Nominal_Token_Terakhir_Rp"].apply(
+            kategorikan_nominal
+        )
+
+    if ("Total_Energi_Semua_kWhPerHari" in df.columns and 
+        "Nominal_Token_Terakhir_Rp" in df.columns):
+        df["Energi_Per_Nominal"] = (
+            df["Total_Energi_Semua_kWhPerHari"] /
+            (df["Nominal_Token_Terakhir_Rp"] / 1000.0 + 0.01)
+        )
+
+    if ("Estimasi_Fisika_Durasi_Hari" in df.columns and 
+        "Durasi_Dari_Frekuensi" in df.columns):
+        df["Fisika_vs_Frekuensi_Gap"] = (
+            df["Estimasi_Fisika_Durasi_Hari"] - df["Durasi_Dari_Frekuensi"]
+        )
+        df["Rasio_Fisika_vs_Frekuensi"] = df["Estimasi_Fisika_Durasi_Hari"] / (df["Durasi_Dari_Frekuensi"] + 1e-8)
+        df["Rasio_Fisika_vs_Frekuensi"] = df["Rasio_Fisika_vs_Frekuensi"].clip(0.1, 10.0)
 
     # 2. PASCABAYAR: Estimasi Fisika Tagihan Rp
     #    Total kWh bulanan * Tarif * 1.05 PPJ + 2500 Admin
@@ -294,7 +377,32 @@ def preprocess(df: pd.DataFrame) -> pd.DataFrame:
             df["Daya_Listrik_Rumah_VA"] * df["Total_Energi_Semua_kWhPerHari"]
         )
 
-    return df
+    # =================================================================
+    # STEP 7: Numeric Feature Scaling
+    # =================================================================
+    from src.config.config import config
+    numeric_cols_to_scale = config.get("numeric_cols", []) + [
+        "Estimasi_Fisika_Tagihan_Rp", "Tarif_PLN_Eksak_Rp", "Daya_x_TotalEnergi",
+        "Estimasi_kWh_Didapat", "Estimasi_Fisika_Durasi_Hari"
+    ]
+    
+    out_scaler_params = {} if scaler_params is None else scaler_params.copy()
+    
+    for col in numeric_cols_to_scale:
+        if col in df.columns:
+            if scaler_params is None:
+                min_val, max_val = fit_minmax(df[col].astype(float))
+                out_scaler_params[col] = {"min": min_val, "max": max_val}
+            else:
+                if col in scaler_params:
+                    min_val = scaler_params[col]["min"]
+                    max_val = scaler_params[col]["max"]
+                else:
+                    min_val, max_val = 0.0, 1.0
+                    
+            df[col] = apply_minmax(df[col].astype(float), min_val, max_val)
+
+    return df, out_scaler_params
 
 
 # =====================================================================
@@ -333,7 +441,7 @@ def load_and_preprocess(path: str) -> pd.DataFrame:
         }).astype(float)
 
     # Run main preprocessing
-    df = preprocess(df)
+    df, _ = preprocess(df)
 
     return df
 
@@ -357,6 +465,7 @@ def train_test_split(
 
     test_data = combined[:test_size]
     train_data = combined[test_size:]
+
 
     x_train = [item[0] for item in train_data]
     y_train = [item[1] for item in train_data]
@@ -418,7 +527,7 @@ def transform_minmax(x_data: list[list[float]], scaler: dict) -> list[list[float
 def fit_target_scaler(y_data: list[float], use_log: bool = False) -> dict:
     """Fit MinMax scaler on target values, optionally with log-transform."""
     if use_log:
-        y_transformed = [math.log(y) for y in y_data]
+        y_transformed = [float(np.log1p(y)) for y in y_data]
     else:
         y_transformed = y_data
 
@@ -438,7 +547,7 @@ def transform_target(y_data: list[float], scaler: dict) -> list[float]:
     scaled = []
 
     for value in y_data:
-        v = math.log(value) if use_log else value
+        v = float(np.log1p(value)) if use_log else value
 
         if max_value == min_value:
             scaled.append(0.0)
@@ -453,6 +562,6 @@ def inverse_transform_target(value: float, scaler: dict) -> float:
     raw = value * (scaler["max"] - scaler["min"]) + scaler["min"]
 
     if scaler.get("use_log", False):
-        return math.exp(raw)
+        return float(np.expm1(raw))
 
     return raw

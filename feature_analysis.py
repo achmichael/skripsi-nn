@@ -15,7 +15,7 @@ import os
 import sys
 
 from src.pipeline.preprocessing import (
-    load_csv,
+    load_and_preprocess,
     train_test_split,
     fit_minmax_scaler,
     transform_minmax,
@@ -113,7 +113,7 @@ def analyze(model_type: str):
     print(f"{'='*70}\n")
 
     # Load data
-    rows = load_csv(cfg["dataset_path"])
+    rows = load_and_preprocess(cfg["dataset_path"])
     x_data, y_data, feature_columns, target_column = extract_features_and_target(rows, model_type)
     print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur")
     print(f"Target: {target_column}\n")
@@ -181,7 +181,6 @@ def analyze(model_type: str):
             f"{r['index']+1:>3} | {r['feature']:<52} | {r['variance']:>14.6f} | "
             f"{r['unique_count']:>6} | {r['abs_correlation']:>10.4f}{flag}"
         )
-
     # ============================================================
     # 4. KORELASI ANTAR FITUR (deteksi multikolinearitas)
     # ============================================================

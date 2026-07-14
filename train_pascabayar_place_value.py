@@ -2,10 +2,9 @@ import json
 import math
 import os
 import sys
+import numpy as np
 
-# pyrefly: ignore [missing-import]
 import matplotlib.pyplot as plt
-# pyrefly: ignore [missing-import]
 import matplotlib.ticker as mticker
 
 from src.pipeline.preprocessing import (
@@ -13,19 +12,12 @@ from src.pipeline.preprocessing import (
     train_test_split,
     fit_minmax_scaler,
     transform_minmax,
-    fit_target_scaler,
-    transform_target,
-    inverse_transform_target,
 )
 from src.pipeline.feature_extraction import extract_features_and_target
-from src.utils.core import (
-    train_model,
-    evaluate_model,
-)
-from src.models.pascabayar import PascabayarModel
-from src.models.prabayar import PrabayarModel
-from src.models.neural_network import NeuralNetwork
+from src.utils.core import train_model, evaluate_model
+from src.models.pascabayar_place_value import PascabayarPlaceValueModel
 from src.config.config import config
+
 
 def save_loss_curve(history: dict, save_path: str, model_type: str):
     """Plot training loss curve dengan titik per epoch, anotasi best loss, dan val loss."""
@@ -37,13 +29,10 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
 
     trained_epochs = len(train_loss)
     epoch_axis = list(range(1, trained_epochs + 1))
-
-    # Ukuran marker: kecil jika banyak epoch agar tidak berantakan
     marker_size = max(1.5, 5.0 - trained_epochs * 0.008)
 
     fig, ax = plt.subplots(figsize=(12, 6))
 
-    # --- Train loss ---
     ax.plot(
         epoch_axis, train_loss,
         color="#1565C0", linewidth=1.5,
@@ -52,7 +41,6 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
         zorder=3,
     )
 
-    # --- Validation loss ---
     if val_loss:
         ax.plot(
             epoch_axis, val_loss,
@@ -62,7 +50,6 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
             zorder=3,
         )
 
-    # --- Titik best train loss ---
     best_epoch = train_loss.index(min(train_loss)) + 1
     best_val   = min(train_loss)
     ax.scatter(
@@ -71,7 +58,6 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
         label=f"Best Train Loss (epoch {best_epoch}: {best_val:.6f})",
     )
 
-    # --- Garis vertikal early stopping ---
     ax.axvline(
         x=trained_epochs, color="gray", linestyle=":", linewidth=1.2,
         label=f"Early stop (epoch {trained_epochs})",
@@ -90,27 +76,23 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
     plt.savefig(save_path, dpi=150)
     plt.close()
 
-    print(f"Loss curve disimpan ke: {save_path} (epoch aktual: {trained_epochs})")
-    
+
 def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: str, label: str):
     """Plot scatter prediksi vs aktual dengan satuan ribu Rp, zona toleransi, dan statistik."""
-    # Konversi ke ribu Rp agar label sumbu terbaca jelas
     scale = 1_000
     actual_k  = [v / scale for v in y_actual]
     pred_k    = [v / scale for v in y_predicted]
 
-    # Hitung R²
     mean_actual = sum(actual_k) / len(actual_k)
     ss_tot = sum((a - mean_actual) ** 2 for a in actual_k)
     ss_res = sum((a - p) ** 2 for a, p in zip(actual_k, pred_k))
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
 
-    # Hitung persen prediksi dalam toleransi ±20%
     within_20pct = sum(
         1 for a, p in zip(actual_k, pred_k)
         if a != 0 and abs(p - a) / abs(a) <= 0.20
     )
-    pct_within = within_20pct / len(actual_k) * 100
+    pct_within = within_20pct / len(actual_k) * 100 if len(actual_k) > 0 else 0
 
     all_vals = actual_k + pred_k
     min_val  = min(all_vals)
@@ -121,7 +103,6 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
 
     fig, ax = plt.subplots(figsize=(9, 8))
 
-    # Zona toleransi ±20%
     ref = [lo, hi]
     ax.fill_between(
         ref,
@@ -132,21 +113,17 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
         label="Toleransi ±20%",
     )
 
-    # Scatter points — warna berdasarkan masuk/keluar toleransi
     colors = [
         "#4CAF50" if abs(a) > 0 and abs(p - a) / abs(a) <= 0.20 else "#F44336"
         for a, p in zip(actual_k, pred_k)
     ]
     ax.scatter(actual_k, pred_k, c=colors, alpha=0.75, s=35, zorder=3)
 
-    # Garis ideal y = x
     ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5, label="Ideal (y = x)", zorder=4)
 
-    # Dummy scatter untuk legend
     ax.scatter([], [], c="#4CAF50", s=35, label=f"Dalam toleransi ({within_20pct}/{len(actual_k)} titik)")
     ax.scatter([], [], c="#F44336", s=35, label="Di luar toleransi")
 
-    # Format sumbu dengan satuan ribu Rp — tampilkan angka bulat ribuan
     def fmt_ribu(x, _):
         return f"{x:,.0f} rb"
 
@@ -162,7 +139,6 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
     ax.legend(fontsize=9, loc="upper left")
     ax.grid(True, alpha=0.3)
 
-    # Kotak statistik
     stats_text = f"R² = {r2:.4f}\nDalam ±20%: {pct_within:.1f}%"
     ax.text(
         0.98, 0.05, stats_text,
@@ -176,7 +152,6 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
     plt.tight_layout()
     plt.savefig(save_path, dpi=150)
     plt.close()
-    print(f"Scatter plot disimpan ke: {save_path}")
 
 
 def plot_error_distribution(
@@ -186,20 +161,6 @@ def plot_error_distribution(
     save_path: str | None = None,
     show: bool = True,
 ) -> None:
-    """
-    Membuat visualisasi distribusi error prediksi Neural Network dan 
-    breakdown Mean Absolute Error (MAE) berdasarkan bucket tagihan aktual.
-
-    Args:
-        y_true: List nilai aktual (dalam Rupiah).
-        y_pred: List nilai prediksi model (dalam Rupiah).
-        mae_rupiah: Nilai keseluruhan Mean Absolute Error (dalam Rupiah).
-        save_path: Path opsional untuk menyimpan grafik sebagai PNG.
-        show: Apakah akan menampilkan plot secara interaktif.
-    """
-    import numpy as np
-    import matplotlib.pyplot as plt
-
     y_t = np.array(y_true)
     y_p = np.array(y_pred)
     errors = y_p - y_t
@@ -208,7 +169,6 @@ def plot_error_distribution(
     if n == 0:
         return
 
-    # REQUIREMENT 1: Auto Unit Scaling
     max_abs_err = np.max(np.abs(errors))
     if max_abs_err < 500_000:
         unit_divider = 1_000.0
@@ -229,14 +189,8 @@ def plot_error_distribution(
 
     fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(12, 10))
 
-    # =========================================================================
-    # REQUIREMENT 2: Error Distribution Plot (Subplot 1)
-    # =========================================================================
-    
-    # 2a: Fixed 30 bins
     ax1.hist(errors_scaled, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
     
-    # 2b & 2c: 10 evenly spaced ticks formatted to 1 decimal with + sign
     ticks = np.linspace(min_e, max_e, 10)
     ax1.set_xticks(ticks)
     ax1.set_xticklabels([f"{v:+.1f}" for v in ticks])
@@ -245,19 +199,11 @@ def plot_error_distribution(
     ax1.set_ylabel("Frekuensi", fontsize=12)
     ax1.set_title("Distribusi Error Prediksi", fontsize=14, fontweight='bold')
 
-    # 2f: Light green shaded region for ±MAE
     ax1.axvspan(-mae_scaled, mae_scaled, color='lightgreen', alpha=0.3, label='±MAE zone')
 
-    # 2e: Reference lines with dynamic anti-overlap offsets (0.5% of range)
     offset = max(range_e * 0.005, 1e-5)
-    mean_offset = 0.0
-    median_offset = 0.0
-    
-    if abs(mean_e - 0.0) <= offset * 2:
-        mean_offset = offset
-    
-    if abs(median_e - 0.0) <= offset * 2 or abs(median_e - mean_e) <= offset * 2:
-        median_offset = -offset
+    mean_offset = offset if abs(mean_e - 0.0) <= offset * 2 else 0.0
+    median_offset = -offset if (abs(median_e - 0.0) <= offset * 2 or abs(median_e - mean_e) <= offset * 2) else 0.0
 
     ax1.axvline(0, color='black', linestyle='-', linewidth=2, label='Zero Error')
     ax1.axvline(mean_e + mean_offset, color='orange', linestyle='--', linewidth=2, label='Mean')
@@ -265,7 +211,6 @@ def plot_error_distribution(
     
     ax1.legend(loc='upper left', fontsize=10)
 
-    # 2d: Annotation box
     stats_text = (
         f"n = {n} data\n"
         f"Mean = {mean_e:+.1f} {unit_name}\n"
@@ -277,10 +222,6 @@ def plot_error_distribution(
     ax1.text(0.95, 0.95, stats_text, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', horizontalalignment='right', bbox=props)
 
-    # =========================================================================
-    # REQUIREMENT 3: Per-Bucket Error Breakdown (Subplot 2)
-    # =========================================================================
-    
     buckets = [
         (0, 150_000, "0–150rb"),
         (150_000, 300_000, "150–300rb"),
@@ -327,7 +268,6 @@ def plot_error_distribution(
     ax2.set_ylabel("MAE (ribu Rp)", fontsize=12)
     ax2.set_title("Mean Absolute Error per Bucket Tagihan Aktual", fontsize=14, fontweight='bold')
     
-    # Annotate bars with sample counts
     for bar, count in zip(bars, bucket_counts):
         height = bar.get_height()
         if count > 0:
@@ -335,36 +275,26 @@ def plot_error_distribution(
                      f"n={count}", ha='center', va='bottom', fontsize=10)
 
     plt.tight_layout()
-    
     if save_path:
         plt.savefig(save_path, dpi=150)
-        print(f"Error distribution disimpan ke: {save_path}")
-        
     if show:
         plt.show()
     else:
         plt.close(fig)
 
 
-def save_metrics_json(metrics: dict, save_path: str):
-    """Simpan metrik evaluasi ke JSON."""
-    with open(save_path, "w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=4, ensure_ascii=False)
-    print(f"Metrics JSON disimpan ke: {save_path}")
-
-
-def run_training(model_type: str):
+def run_training():
+    model_type = "pascabayar"
     cfg = config[model_type]
+    
+    # Override directories for place value model
+    model_path = "results/pascabayar_place_value/models/model_place_value.json"
+    metrics_dir = "results/pascabayar_place_value/metrics"
+    
+    os.makedirs(os.path.dirname(model_path), exist_ok=True)
+    os.makedirs(metrics_dir, exist_ok=True)
 
-    if not os.path.exists(cfg["dataset_path"]):
-        raise FileNotFoundError(f"Dataset tidak ditemukan: {cfg['dataset_path']}")
-
-    # Buat folder results
-    os.makedirs(os.path.dirname(cfg["model_path"]), exist_ok=True)
-    os.makedirs(cfg["metrics_dir"], exist_ok=True)
-
-    print(f"=== Training model {model_type.upper()} ===\n")
-    print(f"[INFO] Log transform: {cfg.get('use_log_transform', False)}")
+    print(f"=== Training PASCABAYAR PLACE VALUE MODEL ===\n")
 
     # Load & encode
     rows = load_and_preprocess(cfg["dataset_path"])
@@ -377,7 +307,6 @@ def run_training(model_type: str):
     )
     input_size = len(feature_columns)
     print(f"Fitur: {input_size} kolom")
-    print(f"Nama fitur: {feature_columns}")
     print(f"Target: {target_column}\n")
 
     # Split
@@ -387,38 +316,26 @@ def run_training(model_type: str):
         test_ratio=0.2,
         seed=42,
     )
-    print(f"Train: {len(x_train)}, Test: {len(x_test)}\n")
 
-    # Scale
+    # Scale features
     x_scaler = fit_minmax_scaler(x_train)
     x_train_scaled = transform_minmax(x_train, x_scaler)
     x_test_scaled = transform_minmax(x_test, x_scaler)
 
-    y_scaler = fit_target_scaler(y_train, use_log=cfg.get("use_log_transform", False))
-    y_train_scaled = transform_target(y_train, y_scaler)
-    y_test_scaled = transform_target(y_test, y_scaler)
+    # Target scaling for Place Value: simply divide by 1,000,000
+    y_train_scaled = [y / 1_000_000.0 for y in y_train]
+    y_test_scaled = [y / 1_000_000.0 for y in y_test]
 
-    # Build layer sizes: [input, ...hidden..., 1]
-    layer_sizes = [input_size] + cfg["hidden_layers"] + [1]
-    print(f"Arsitektur: {layer_sizes}")
+    model = PascabayarPlaceValueModel(
+        input_size=input_size,
+        hidden_size=7,
+        num_components=7,
+        seed=42,
+        clip_value=cfg["clip_value"],
+        l2_lambda=cfg.get("l2_lambda", 0.0),
+        component_activation="relu"
+    )
 
-    # Build model berdasarkan model_type
-    if model_type == "pascabayar":
-        model: NeuralNetwork = PascabayarModel(
-            layer_sizes=layer_sizes,
-            seed=42,
-            clip_value=cfg["clip_value"],
-            l2_lambda=cfg.get("l2_lambda", 0.0),
-        )
-    else:
-        model = PrabayarModel(
-            layer_sizes=layer_sizes,
-            seed=42,
-            clip_value=cfg["clip_value"],
-            l2_lambda=cfg.get("l2_lambda", 0.0),
-        )
-
-    # Train
     print("Mulai training...")
     history = train_model(
         model=model,
@@ -432,13 +349,8 @@ def run_training(model_type: str):
         x_val=x_test_scaled,
         y_val=y_test_scaled,
         lr_decay=cfg.get("lr_decay", 0.0),
-        # ── NEW ─────────────────────────────────────────────────
-        use_sample_weights=True,
-        y_scaler=y_scaler,
-        use_log=cfg.get("use_log_transform", False),
-        model_type=model_type,
-        # ────────────────────────────────────────────────────────
     )
+    
     total_epochs = len(history["train_loss"])
     print(f"Training selesai. Total epoch aktual: {total_epochs}")
 
@@ -449,15 +361,12 @@ def run_training(model_type: str):
         y_test=y_test_scaled,
     )
 
-    print(f"\nEvaluasi (skala normalisasi):")
+    print(f"\nEvaluasi (skala normalisasi / 1.000.000):")
     print(f"  MSE: {evaluation['mse']:.8f}")
     print(f"  MAE: {evaluation['mae']:.8f}")
 
     # MAPE & RMSE in original scale
-    preds_orig = [
-        inverse_transform_target(p, y_scaler)
-        for p in evaluation["predictions"]
-    ]
+    preds_orig = [p * 1_000_000.0 for p in evaluation["predictions"]]
     errors_orig = [p - a for p, a in zip(preds_orig, y_test)]
 
     mape = sum(
@@ -470,39 +379,30 @@ def run_training(model_type: str):
     mae_orig = sum(abs(e) for e in errors_orig) / len(errors_orig)
 
     print(f"  MAPE: {mape:.2f}%")
-    print(f"\nEvaluasi (skala asli):")
+    print(f"\nEvaluasi (skala asli Rp):")
     print(f"  MSE: {mse_orig:,.4f}")
     print(f"  RMSE: {rmse_orig:,.4f}")
     print(f"  MAE: {mae_orig:,.4f}")
 
-    # Sample predictions
-    print(f"\n--- Perbandingan Prediksi vs Aktual (15 Data Pertama) [{cfg['target_label']}] ---")
-    for i in range(min(15, len(x_test_scaled))):
-        pred = preds_orig[i]
-        actual = y_test[i]
-        selisih = errors_orig[i]
-        print(f"Data {i+1:2d} | Aktual: {actual:>12,.2f} | Prediksi: {pred:>12,.2f} | Selisih: {selisih:>12,.2f}")
+    print("\n--- Perbandingan Prediksi vs Aktual (15 Data Pertama) ---")
+    for i in range(min(15, len(y_test))):
+        print(f"Data {i+1:2d} | Aktual: Rp {y_test[i]:>10,.0f} | Prediksi: Rp {preds_orig[i]:>10,.0f} | Selisih: Rp {errors_orig[i]:>10,.0f}")
 
-    # === Simpan metrics ===
-    metrics_dir = cfg["metrics_dir"]
-
-    # 1. Training loss curve
+    # Visualisasi dan Metrik
     save_loss_curve(
         history=history,
         save_path=os.path.join(metrics_dir, "training_loss_curve.png"),
-        model_type=model_type,
+        model_type="pascabayar_place_value",
     )
 
-    # 2. Scatter prediksi vs aktual
     save_prediction_scatter(
         y_actual=y_test,
         y_predicted=preds_orig,
         save_path=os.path.join(metrics_dir, "prediction_vs_actual.png"),
-        model_type=model_type,
+        model_type="pascabayar_place_value",
         label=cfg["target_label"],
     )
 
-    # 3. Error distribution
     plot_error_distribution(
         y_true=y_test,
         y_pred=preds_orig,
@@ -511,18 +411,15 @@ def run_training(model_type: str):
         show=False,
     )
 
-    # 4. Metrics JSON
-    train_loss_list = history["train_loss"]
-    val_loss_list = history["val_loss"]
     metrics_data = {
-        "model_type": model_type,
-        "arsitektur": layer_sizes,
+        "model_type": "pascabayar_place_value",
+        "arsitektur": [input_size, 7, 7],
         "learning_rate": cfg["learning_rate"],
         "total_epochs": total_epochs,
-        "final_train_loss": train_loss_list[-1],
-        "best_train_loss": min(train_loss_list),
-        "final_val_loss": val_loss_list[-1] if val_loss_list else None,
-        "best_val_loss": min(val_loss_list) if val_loss_list else None,
+        "final_train_loss": history["train_loss"][-1] if history["train_loss"] else None,
+        "best_train_loss": min(history["train_loss"]) if history["train_loss"] else None,
+        "final_val_loss": history["val_loss"][-1] if history["val_loss"] else None,
+        "best_val_loss": min(history["val_loss"]) if history["val_loss"] else None,
         "evaluasi_normalisasi": {
             "mse": evaluation["mse"],
             "mae": evaluation["mae"],
@@ -538,43 +435,21 @@ def run_training(model_type: str):
             "test": len(x_test),
         },
     }
-    save_metrics_json(
-        metrics=metrics_data,
-        save_path=os.path.join(metrics_dir, "evaluation_metrics.json"),
-    )
+    
+    metrics_file = os.path.join(metrics_dir, "evaluation_metrics.json")
+    with open(metrics_file, "w", encoding="utf-8") as f:
+        json.dump(metrics_data, f, indent=4, ensure_ascii=False)
+    print(f"Metrics JSON disimpan ke: {metrics_file}")
 
-    # === Simpan model ===
     metadata = {
-        "model_type": model_type,
+        "model_type": "pascabayar_place_value",
         "feature_columns": feature_columns,
         "target_column": target_column,
         "x_scaler": x_scaler,
-        "y_scaler": y_scaler,
-        "layer_sizes": layer_sizes,
     }
 
-    model.save(cfg["model_path"], metadata=metadata)
-    print(f"\nModel disimpan ke: {cfg['model_path']}")
-
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <prabayar|pascabayar|all>")
-        sys.exit(1)
-
-    choice = sys.argv[1].lower()
-
-    if choice == "all":
-        for model_type in config:
-            run_training(model_type)
-            print("\n" + "=" * 60 + "\n")
-    elif choice in config:
-        run_training(choice)
-    else:
-        print(f"Model type tidak dikenal: {choice}")
-        print("Pilih: prabayar, pascabayar, atau all")
-        sys.exit(1)
-
+    model.save(model_path, metadata=metadata)
+    print(f"\nModel disimpan ke: {model_path}")
 
 if __name__ == "__main__":
-    main()
+    run_training()

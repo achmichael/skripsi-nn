@@ -4,28 +4,31 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [64, 32],
+        "hidden_layers": [32,],
         "learning_rate": 0.005,
-        "patience": 5,
-        "min_delta": 1e-4,
+        "patience": 25,
+        "min_delta": 1e-5,
         "clip_value": 5.0,
         "batch_size": 16,
+        "l2_lambda": 1e-3,         # tambahkan L2 — belum ada di config prabayar!
+        "lr_decay": 0.001,         # tambahkan LR decay
         "target_label": "durasi token (hari)",
-        "target": "Token_Habis_Dalam_Hari" 
+        "target": "Token_Habis_Dalam_Hari",
+        "use_log_transform": True,
     },
     "pascabayar": {
         "dataset_path": "data/pascabayar.csv",
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
-        "hidden_layers": [128, 64, 32],
+        "hidden_layers": [64, 32],
         "learning_rate": 0.005,
 
         "patience": 30,
         "min_delta": 1e-5,
         "clip_value": 5.0,
         "batch_size": 16,
-        "l2_lambda": 1e-4,
+        "l2_lambda": 1e-3,
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
         # "target": "Tagihan_Bulan_Terakhir_Rp",
@@ -33,7 +36,7 @@ config = {
         "use_log_transform": False,
     },
     "features": {
-        "prabayar": [
+        "prabayar": [  
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
             "Status_Subsidi_Listrik",
@@ -41,33 +44,33 @@ config = {
             "Frekuensi_Isi_Token_Per_Bulan",
 
             "Kulkas_Jumlah",
-            "Kulkas_Kategori",
-            "Kulkas_EstimasiWattPerUnit",
+            # "Kulkas_Kategori",             # PRUNED: redundant with JamPerHari
+            # "Kulkas_EstimasiWattPerUnit",  # PRUNED: redundant with kWhPerHari
             "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
 
             "TV_Jumlah",
-            "TV_Kategori",
-            "TV_EstimasiWattPerUnit",
+            # "TV_Kategori",                 # PRUNED: redundant with JamPerHari
+            # "TV_EstimasiWattPerUnit",      # PRUNED: redundant with kWhPerHari
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
 
             "AC_Jumlah",
-            "AC_PK_Kategori",
-            "AC_Kategori",
-            "AC_EstimasiWattPerUnit",
+            # "AC_PK_Kategori",              # PRUNED: redundant with WattPerUnit
+            # "AC_Kategori",                 # PRUNED: redundant with JamPerHari
+            # "AC_EstimasiWattPerUnit",      # PRUNED: redundant with kWhPerHari
             "AC_EstimasiJamPerHari",
             "AC_Energi_kWhPerHari",
 
             "Kipas_Jumlah",
-            "Kipas_Kategori",
-            "Kipas_EstimasiWattPerUnit",
+            # "Kipas_Kategori",              # PRUNED: redundant with JamPerHari
+            # "Kipas_EstimasiWattPerUnit",   # PRUNED: redundant with kWhPerHari
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
 
             "RiceCooker_Jumlah",
-            "RiceCooker_Kategori",
-            "RiceCooker_EstimasiWattPerUnit",
+            # "RiceCooker_Kategori",             # PRUNED: redundant with JamPerHari
+            # "RiceCooker_EstimasiWattPerUnit",  # PRUNED: redundant with kWhPerHari
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
 
@@ -124,7 +127,15 @@ config = {
             "Total_Energi_Semua_kWhPerHari",
             
             # === ENGINEERED FEATURES ===
+            "Tarif_PLN_Eksak_Rp",
+            "Estimasi_kWh_Didapat",
             "Estimasi_Fisika_Durasi_Hari",
+            "Durasi_Dari_Frekuensi",
+            "Rasio_Token_vs_Energi",
+            "Token_Nominal_Kategori",
+            "Energi_Per_Nominal",
+            "Fisika_vs_Frekuensi_Gap",
+            "Rasio_Fisika_vs_Frekuensi",
         ],
 
         "pascabayar": [
@@ -243,7 +254,15 @@ config = {
         "Estimasi_Tarif_Per_kWh_Rp",
         "Estimasi_Biaya_Energi_Bulanan_Rp",
         "Daya_x_TotalEnergi",
+        "Tarif_PLN_Eksak_Rp",
+        "Estimasi_kWh_Didapat",
         "Estimasi_Fisika_Durasi_Hari",
+        "Durasi_Dari_Frekuensi",
+        "Rasio_Token_vs_Energi",
+        "Token_Nominal_Kategori",
+        "Energi_Per_Nominal",
+        "Fisika_vs_Frekuensi_Gap",
+        "Rasio_Fisika_vs_Frekuensi",
         "Estimasi_Fisika_Tagihan_Rp",
     ],
     # Ordinal encoding: maps categorical string -> numeric value

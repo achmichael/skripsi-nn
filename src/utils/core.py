@@ -1,9 +1,59 @@
 import json
 import math
 import random
+import copy
+import numpy as np
 
 from src.activations.ReLU import relu, relu_derivative
 from src.models.neural_network import NeuralNetwork
+from src.pipeline.preprocessing import inverse_transform_target
+
+def compute_sample_weight(
+    y_normalized: float,
+    y_scaler: dict,
+    use_log: bool = False,
+    model_type: str = "pascabayar",
+) -> float:
+    """
+    Compute per-sample loss weight based on the original Rupiah value
+    of the target. Samples with low bill amounts receive higher weight
+    to compensate for their under-representation in the training set.
+
+    Weight scheme:
+      Aktual < 100,000 Rp  → weight = 3.0  (low bill, underrepresented)
+      Aktual < 200,000 Rp  → weight = 1.5  (medium-low, slightly boost)
+      Aktual >= 200,000 Rp → weight = 1.0  (normal, no boost)
+
+    Args:
+        y_normalized : target value in normalized scale (after minmax 
+                       and optional log transform)
+        y_scaler     : scaler dict from fit_target_scaler(), used to 
+                       convert normalized value back to Rupiah
+        use_log      : whether log transform was applied to target,
+                       must match the use_log_transform config value
+
+    Returns:
+        float: sample weight >= 1.0
+    """
+    # Convert normalized → original scale (Rupiah for pascabayar, days for prabayar)
+    y_original = inverse_transform_target(y_normalized, y_scaler)
+
+    if model_type == "pascabayar":
+        if y_original < 100_000:
+            return 2.0
+        elif y_original < 200_000:
+            return 1.5
+        else:
+            return 1.0
+    elif model_type == "prabayar":
+        if y_original <= 10.0:
+            return 2.5
+        elif y_original >= 25.0:
+            return 2.0
+        else:
+            return 1.0
+    
+    return 1.0
 
 def mean_squared_error_single(prediction: float, target: float) -> float:
     error = prediction - target
@@ -40,48 +90,24 @@ def train_model(
     x_val: list[list[float]] | None = None,
     y_val: list[float] | None = None,
     lr_decay: float = 0.0,
+    # ── NEW PARAMETERS ──────────────────────────────────────
+    use_sample_weights: bool = False,
+    y_scaler: dict | None = None,
+    use_log: bool = False,
+    model_type: str = "pascabayar",
+    # ────────────────────────────────────────────────────────
 ) -> dict:
     """
-    Train dengan Mini-Batch Gradient Descent, early stopping,
-    dan opsional validation loss per epoch.
-
-    ════════════════════════════════════════════════════════════
-    CARA KERJA MINI-BATCH DALAM TRAINING LOOP:
-    ════════════════════════════════════════════════════════════
-    Jika ada 100 data training dan batch_size=16:
-      - Batch 1: data ke-0  s/d 15  (16 sampel)
-      - Batch 2: data ke-16 s/d 31  (16 sampel)
-      - ...
-      - Batch 6: data ke-80 s/d 95  (16 sampel)
-      - Batch 7: data ke-96 s/d 99  (4 sampel — sisa terakhir)
-
-    Setiap batch → 1× update bobot.
-    Jadi per epoch ada 7 update, bukan 100 (Pure SGD) atau 1 (Full-Batch).
-
-    KENAPA ini membantu data kuesioner yang noisy:
-      - Pure SGD: 1 baris noisy langsung mengubah bobot → tidak stabil
-      - Mini-Batch: 16 baris dirata-ratakan → noise saling meredam
-      - Bobot bergerak ke arah yang lebih "benar" dan konsisten
-
-    Args:
-        model        : Instance NeuralNetwork yang akan dilatih.
-        x_train      : Fitur data training (sudah dinormalisasi).
-        y_train      : Target data training (sudah dinormalisasi).
-        learning_rate: Laju pembelajaran.
-        batch_size   : Jumlah sampel per mini-batch (default 16).
-                       Rekomendasi: 16 atau 32 untuk data kuesioner.
-        patience     : Jumlah epoch tanpa perbaikan sebelum early stopping.
-        min_delta    : Minimum penurunan loss yang dianggap sebagai perbaikan.
-        epochs       : Batas maksimum epoch (None = tidak terbatas).
-        x_val        : Fitur data validasi opsional (sudah dinormalisasi).
-        y_val        : Target data validasi opsional (sudah dinormalisasi).
-
-    Returns:
-        Dict berisi:
-          - "train_loss": list train loss per epoch
-          - "val_loss"  : list val loss per epoch (kosong jika x_val tidak diberikan)
+    use_sample_weights : if True, apply per-sample loss weighting based on original Rupiah value
+    y_scaler          : required if use_sample_weights=True, used to inverse-transform for weight lookup
+    use_log           : must match use_log_transform config value, passed through to inverse_transform_target
     """
-    n_samples = len(x_train)
+    
+    # Convert lists to NumPy arrays for fast vectorized operations
+    X_train_np = np.array(x_train, dtype=np.float32)
+    y_train_np = np.array(y_train, dtype=np.float32).reshape(-1, 1)
+
+    n_samples = len(X_train_np)
     train_loss_history: list[float] = []
     val_loss_history: list[float] = []
 
@@ -92,6 +118,24 @@ def train_model(
     best_biases = None
 
     has_val = x_val is not None and y_val is not None
+    if has_val:
+        X_val_np = np.array(x_val, dtype=np.float32)
+        y_val_np = np.array(y_val, dtype=np.float32).reshape(-1, 1)
+
+    if use_sample_weights and y_scaler is not None:
+        w_counts = {1.0: 0, 1.5: 0, 2.0: 0, 2.5: 0}
+        for y_val_i in y_train:
+            w = compute_sample_weight(float(y_val_i), y_scaler, use_log, model_type)
+            w_counts[w] = w_counts.get(w, 0) + 1
+            
+        if model_type == "pascabayar":
+            print(f"[Sample Weights] weight=2.0 (< 100rb) : {w_counts.get(2.0, 0)} samples")
+            print(f"[Sample Weights] weight=1.5 (< 200rb) : {w_counts.get(1.5, 0)} samples")
+            print(f"[Sample Weights] weight=1.0 (>= 200rb): {w_counts.get(1.0, 0)} samples")
+        else:
+            print(f"[Sample Weights] weight=2.5 (<= 10 hari) : {w_counts.get(2.5, 0)} samples")
+            print(f"[Sample Weights] weight=2.0 (>= 25 hari) : {w_counts.get(2.0, 0)} samples")
+            print(f"[Sample Weights] weight=1.0 (normal) : {w_counts.get(1.0, 0)} samples")
 
     while True:
         epoch += 1
@@ -100,43 +144,48 @@ def train_model(
             print(f"Mencapai batas maksimum {epochs} epoch.")
             break
 
-        # --- Shuffle training data setiap epoch ---
-        # Agar komposisi batch berbeda tiap epoch → model tidak
-        # menghafal urutan data
-        indices = list(range(n_samples))
-        random.shuffle(indices)
-        x_shuffled = [x_train[i] for i in indices]
-        y_shuffled = [y_train[i] for i in indices]
+        # Shuffle
+        indices = np.random.permutation(n_samples)
+        X_shuffled = X_train_np[indices]
+        y_shuffled = y_train_np[indices]
 
-        # --- Learning rate decay ---
-        # Reduce LR over time: lr_t = lr_0 / (1 + decay * epoch)
         current_lr = learning_rate / (1.0 + lr_decay * epoch)
 
-        # --- Training pass: potong data menjadi mini-batch ---
         total_train_loss = 0.0
         n_batches = 0
 
         for start in range(0, n_samples, batch_size):
             end = min(start + batch_size, n_samples)
-            x_batch = x_shuffled[start:end]
+            x_batch = X_shuffled[start:end]
             y_batch = y_shuffled[start:end]
 
-            # Latih model pada batch ini dan dapatkan rata-rata loss-nya
-            batch_loss = model.train_batch(x_batch, y_batch, current_lr)
+            if use_sample_weights and y_scaler is not None:
+                # Compute per-sample weights for this batch
+                weights = [
+                    compute_sample_weight(
+                        y_normalized=float(y_val_i.item()),
+                        y_scaler=y_scaler,
+                        use_log=use_log,
+                        model_type=model_type,
+                    )
+                    for y_val_i in y_batch
+                ]
+                batch_loss = model.train_batch_weighted(
+                    x_batch, y_batch, current_lr, weights
+                )
+            else:
+                batch_loss = model.train_batch(x_batch, y_batch, current_lr)
+            
             total_train_loss += batch_loss
             n_batches += 1
 
-        # Rata-rata loss dari semua batch dalam epoch ini
         avg_train_loss = total_train_loss / n_batches
         train_loss_history.append(avg_train_loss)
 
-        # --- Validation pass (inferensi saja, tanpa update bobot) ---
         if has_val:
-            total_val_loss = 0.0
-            for inputs, target in zip(x_val, y_val):  # type: ignore[arg-type]
-                pred = model.predict(inputs)
-                total_val_loss += mean_squared_error_single(pred, target)
-            avg_val_loss = total_val_loss / len(y_val)  # type: ignore[arg-type]
+            # Vectorized validation prediction
+            val_preds = model.predict(X_val_np)
+            avg_val_loss = float(np.mean((val_preds - y_val_np) ** 2))
             val_loss_history.append(avg_val_loss)
             val_info = f" | Val Loss: {avg_val_loss:.8f}"
         else:
@@ -144,16 +193,13 @@ def train_model(
 
         print(f"Epoch {epoch} - Train Loss: {avg_train_loss:.8f}{val_info}")
 
-        # --- Early stopping berbasis val loss (jika ada), fallback ke train loss ---
         monitor_loss = avg_val_loss if has_val else avg_train_loss
         if monitor_loss < best_loss - min_delta:
             best_loss = monitor_loss
             epochs_without_improvement = 0
-            # Simpan salinan bobot terbaik (deep copy manual)
             if hasattr(model, 'weights') and hasattr(model, 'biases'):
-                import copy
-                best_weights = copy.deepcopy(model.weights)
-                best_biases = copy.deepcopy(model.biases)
+                best_weights = [np.copy(w) for w in model.weights]
+                best_biases = [np.copy(b) for b in model.biases]
         else:
             epochs_without_improvement += 1
 
@@ -164,7 +210,6 @@ def train_model(
                 f"Tidak ada perbaikan {monitor_name} loss selama {patience} epoch terakhir. "
                 f"Loss terbaik: {best_loss:.8f}"
             )
-            # Restore bobot terbaik
             if best_weights is not None and best_biases is not None:
                 model.weights = best_weights
                 model.biases = best_biases
@@ -183,9 +228,12 @@ def evaluate_model(
     y_test: list[float],
 ) -> dict:
     predictions = []
-
-    for inputs in x_test:
-        predictions.append(model.predict(inputs))
+    
+    # Can process all at once for speed
+    X_test_np = np.array(x_test, dtype=np.float32)
+    preds_np = model.predict(X_test_np)
+    
+    predictions = preds_np.flatten().tolist()
 
     mse = mean_squared_error(predictions, y_test)
     mae = mean_absolute_error(predictions, y_test)

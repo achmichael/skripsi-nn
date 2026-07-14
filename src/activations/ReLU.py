@@ -1,6 +1,7 @@
-def relu(value: float) -> float:
-    return max(0.0, value)
+import numpy as np
 
+def relu(value: np.ndarray) -> np.ndarray:
+    return np.maximum(0.0, value)
 
-def relu_derivative(value: float) -> float:
-    return 1.0 if value > 0 else 0.0
+def relu_derivative(value: np.ndarray) -> np.ndarray:
+    return np.where(value > 0, 1.0, 0.0)
