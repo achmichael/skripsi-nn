@@ -13,6 +13,7 @@ class PrabayarModel(NeuralNetwork):
         seed: int | None = None,
         clip_value: float = 5.0,
         l2_lambda: float = 0.0,
+        asymmetric_alpha: float = 0.5,
     ):
         if len(layer_sizes) < 2:
             raise ValueError(
@@ -27,6 +28,7 @@ class PrabayarModel(NeuralNetwork):
         self.layer_sizes = layer_sizes
         self.clip_value = clip_value
         self.l2_lambda = l2_lambda
+        self.asymmetric_alpha = asymmetric_alpha
         self.num_layers = len(layer_sizes)
 
         if seed is not None:
@@ -45,6 +47,17 @@ class PrabayarModel(NeuralNetwork):
 
             self.weights.append(W)
             self.biases.append(b)
+
+        # Adam optimizer parameters & state
+        self.beta1 = 0.9
+        self.beta2 = 0.999
+        self.epsilon = 1e-8
+        self.t = 0
+        
+        self.m_w = [np.zeros_like(w) for w in self.weights]
+        self.v_w = [np.zeros_like(w) for w in self.weights]
+        self.m_b = [np.zeros_like(b) for b in self.biases]
+        self.v_b = [np.zeros_like(b) for b in self.biases]
 
         # Cache untuk forward/backward pass (list of arrays)
         self._activations: list[np.ndarray] = []      
@@ -104,11 +117,20 @@ class PrabayarModel(NeuralNetwork):
 
         w_np = np.array(weights, dtype=np.float32).reshape(-1, 1)
 
-        squared_errors = (prediction - y_batch) ** 2
+        diff = prediction - y_batch
+        
+        # Asymmetric Loss mask
+        # Jika diff > 0 (over-estimate), bobot penalti adalah self.asymmetric_alpha
+        # Jika diff < 0 (under-estimate), bobot penalti adalah 1.0 - self.asymmetric_alpha
+        # Karena sebelumnya MSE standar menggunakan faktor pengali 1, kita men-scale asym_mask dengan x2 
+        # (sehingga jika alpha=0.5, multiplier = 1, kembali menjadi MSE standar).
+        asym_mask = np.where(diff > 0, self.asymmetric_alpha * 2, (1.0 - self.asymmetric_alpha) * 2)
+
+        squared_errors = asym_mask * (diff ** 2)
         total_loss = float(np.mean(w_np * squared_errors))
         
-        # Weighted gradient — tanpa faktor 2, konsisten dengan L = (1/(2m))Σ(ŷ−y)²
-        output_grad = w_np * (prediction - y_batch) / batch_size
+        # Weighted gradient
+        output_grad = w_np * asym_mask * diff / batch_size
 
         # 2. Backward pass
         deltas = [None] * (self.num_layers - 1)
@@ -121,6 +143,8 @@ class PrabayarModel(NeuralNetwork):
             grad = np.dot(deltas[l + 1], self.weights[l + 1]) # shape: (batch_size, fan_out_curr)
             grad *= relu_derivative(self._pre_activations[l])
             deltas[l] = grad
+
+        self.t += 1
 
         # 3. Update bobot dan bias
         for l in range(self.num_layers - 1):
@@ -136,13 +160,26 @@ class PrabayarModel(NeuralNetwork):
             # Gradient clipping — setelah L2, pada gradien weight
             grad_w = self._clip_gradient(grad_w, self.clip_value)
                 
-            self.weights[l] -= learning_rate * grad_w
+            # Adam update for weights
+            self.m_w[l] = self.beta1 * self.m_w[l] + (1 - self.beta1) * grad_w
+            self.v_w[l] = self.beta2 * self.v_w[l] + (1 - self.beta2) * (grad_w ** 2)
+            m_w_hat = self.m_w[l] / (1 - self.beta1 ** self.t)
+            v_w_hat = self.v_w[l] / (1 - self.beta2 ** self.t)
+
+            self.weights[l] -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + self.epsilon)
 
             # Bias update — skip output layer (output layer tidak punya bias)
             if l < self.num_layers - 2:
                 grad_b = np.sum(deltas[l], axis=0)
                 grad_b = self._clip_gradient(grad_b, self.clip_value)
-                self.biases[l] -= learning_rate * grad_b
+                
+                # Adam update for biases
+                self.m_b[l] = self.beta1 * self.m_b[l] + (1 - self.beta1) * grad_b
+                self.v_b[l] = self.beta2 * self.v_b[l] + (1 - self.beta2) * (grad_b ** 2)
+                m_b_hat = self.m_b[l] / (1 - self.beta1 ** self.t)
+                v_b_hat = self.v_b[l] / (1 - self.beta2 ** self.t)
+
+                self.biases[l] -= learning_rate * m_b_hat / (np.sqrt(v_b_hat) + self.epsilon)
 
         # Mengembalikan unweighted loss agar grafik loss konsisten
         unweighted_loss = self._mse_loss(prediction, y_batch)
@@ -161,10 +198,13 @@ class PrabayarModel(NeuralNetwork):
         if y_batch.ndim == 1:
             y_batch = y_batch.reshape(-1, 1)
 
-        total_loss = self._mse_loss(prediction, y_batch)
+        diff = prediction - y_batch
+        asym_mask = np.where(diff > 0, self.asymmetric_alpha * 2, (1.0 - self.asymmetric_alpha) * 2)
 
-        # δ_out = (1/m)(ŷ − y) — tanpa faktor 2, konsisten dengan L = (1/(2m))Σ(ŷ−y)²
-        output_grad = (prediction - y_batch) / batch_size
+        squared_errors = asym_mask * (diff ** 2)
+        total_loss = float(np.mean(squared_errors) / 2.0) # _mse_loss behaviour
+
+        output_grad = asym_mask * diff / batch_size
 
         # 2. Backward pass
         deltas = [None] * (self.num_layers - 1)
@@ -175,6 +215,8 @@ class PrabayarModel(NeuralNetwork):
             grad = np.dot(deltas[l + 1], self.weights[l + 1]) 
             grad *= relu_derivative(self._pre_activations[l])
             deltas[l] = grad
+
+        self.t += 1
 
         # 3. Update bobot dan bias
         for l in range(self.num_layers - 1):
@@ -189,13 +231,26 @@ class PrabayarModel(NeuralNetwork):
             # Gradient clipping — setelah L2, pada gradien weight
             grad_w = self._clip_gradient(grad_w, self.clip_value)
                 
-            self.weights[l] -= learning_rate * grad_w
+            # Adam update for weights
+            self.m_w[l] = self.beta1 * self.m_w[l] + (1 - self.beta1) * grad_w
+            self.v_w[l] = self.beta2 * self.v_w[l] + (1 - self.beta2) * (grad_w ** 2)
+            m_w_hat = self.m_w[l] / (1 - self.beta1 ** self.t)
+            v_w_hat = self.v_w[l] / (1 - self.beta2 ** self.t)
+
+            self.weights[l] -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + self.epsilon)
 
             # Bias update — skip output layer (output layer tidak punya bias)
             if l < self.num_layers - 2:
                 grad_b = np.sum(deltas[l], axis=0)
                 grad_b = self._clip_gradient(grad_b, self.clip_value)
-                self.biases[l] -= learning_rate * grad_b
+                
+                # Adam update for biases
+                self.m_b[l] = self.beta1 * self.m_b[l] + (1 - self.beta1) * grad_b
+                self.v_b[l] = self.beta2 * self.v_b[l] + (1 - self.beta2) * (grad_b ** 2)
+                m_b_hat = self.m_b[l] / (1 - self.beta1 ** self.t)
+                v_b_hat = self.v_b[l] / (1 - self.beta2 ** self.t)
+
+                self.biases[l] -= learning_rate * m_b_hat / (np.sqrt(v_b_hat) + self.epsilon)
 
         return float(total_loss)
 

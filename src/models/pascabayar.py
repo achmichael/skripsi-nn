@@ -44,6 +44,17 @@ class PascabayarModel(NeuralNetwork):
             self.weights.append(W)
             self.biases.append(b)
 
+        # Adam optimizer parameters & state
+        self.beta1 = 0.9
+        self.beta2 = 0.999
+        self.epsilon = 1e-8
+        self.t = 0
+        
+        self.m_w = [np.zeros_like(w) for w in self.weights]
+        self.v_w = [np.zeros_like(w) for w in self.weights]
+        self.m_b = [np.zeros_like(b) for b in self.biases]
+        self.v_b = [np.zeros_like(b) for b in self.biases]
+
         self._activations: list[np.ndarray] = []
         self._pre_activations: list[np.ndarray] = []
 
@@ -121,6 +132,8 @@ class PascabayarModel(NeuralNetwork):
             grad *= relu_derivative(self._pre_activations[l])
             deltas[l] = grad
 
+        self.t += 1
+
         # Update weight dan bias
         for l in range(self.num_layers - 1):
             inputs_l = self._activations[l]
@@ -134,13 +147,26 @@ class PascabayarModel(NeuralNetwork):
             # Gradient clipping — setelah L2
             grad_w = self._clip_gradient(grad_w, self.clip_value)
 
-            self.weights[l] -= learning_rate * grad_w
+            # Adam update for weights
+            self.m_w[l] = self.beta1 * self.m_w[l] + (1 - self.beta1) * grad_w
+            self.v_w[l] = self.beta2 * self.v_w[l] + (1 - self.beta2) * (grad_w ** 2)
+            m_w_hat = self.m_w[l] / (1 - self.beta1 ** self.t)
+            v_w_hat = self.v_w[l] / (1 - self.beta2 ** self.t)
+
+            self.weights[l] -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + self.epsilon)
 
             # Bias update — skip output layer
             if l < self.num_layers - 2:
                 grad_b = np.sum(deltas[l], axis=0)
                 grad_b = self._clip_gradient(grad_b, self.clip_value)
-                self.biases[l] -= learning_rate * grad_b
+                
+                # Adam update for biases
+                self.m_b[l] = self.beta1 * self.m_b[l] + (1 - self.beta1) * grad_b
+                self.v_b[l] = self.beta2 * self.v_b[l] + (1 - self.beta2) * (grad_b ** 2)
+                m_b_hat = self.m_b[l] / (1 - self.beta1 ** self.t)
+                v_b_hat = self.v_b[l] / (1 - self.beta2 ** self.t)
+
+                self.biases[l] -= learning_rate * m_b_hat / (np.sqrt(v_b_hat) + self.epsilon)
 
         return float(unweighted_loss)
 
@@ -169,6 +195,8 @@ class PascabayarModel(NeuralNetwork):
             grad *= relu_derivative(self._pre_activations[l])
             deltas[l] = grad
 
+        self.t += 1
+
         # Update weight dan bias
         for l in range(self.num_layers - 1):
             inputs_l = self._activations[l]
@@ -182,13 +210,26 @@ class PascabayarModel(NeuralNetwork):
             # Gradient clipping — setelah L2, pada gradien weight
             grad_w = self._clip_gradient(grad_w, self.clip_value)
                 
-            self.weights[l] -= learning_rate * grad_w
+            # Adam update for weights
+            self.m_w[l] = self.beta1 * self.m_w[l] + (1 - self.beta1) * grad_w
+            self.v_w[l] = self.beta2 * self.v_w[l] + (1 - self.beta2) * (grad_w ** 2)
+            m_w_hat = self.m_w[l] / (1 - self.beta1 ** self.t)
+            v_w_hat = self.v_w[l] / (1 - self.beta2 ** self.t)
+
+            self.weights[l] -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + self.epsilon)
 
             # Bias update — skip output layer (output layer tidak punya bias)
             if l < self.num_layers - 2:
                 grad_b = np.sum(deltas[l], axis=0)
                 grad_b = self._clip_gradient(grad_b, self.clip_value)
-                self.biases[l] -= learning_rate * grad_b
+                
+                # Adam update for biases
+                self.m_b[l] = self.beta1 * self.m_b[l] + (1 - self.beta1) * grad_b
+                self.v_b[l] = self.beta2 * self.v_b[l] + (1 - self.beta2) * (grad_b ** 2)
+                m_b_hat = self.m_b[l] / (1 - self.beta1 ** self.t)
+                v_b_hat = self.v_b[l] / (1 - self.beta2 ** self.t)
+
+                self.biases[l] -= learning_rate * m_b_hat / (np.sqrt(v_b_hat) + self.epsilon)
 
         return float(total_loss)
 

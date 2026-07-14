@@ -521,6 +521,48 @@ def transform_minmax(x_data: list[list[float]], scaler: dict) -> list[list[float
 
 
 # =====================================================================
+# FIT / TRANSFORM STANDARD SCALER (untuk fitur numerik global)
+# =====================================================================
+
+def fit_standard_scaler(x_data: list[list[float]]) -> dict:
+    """Fit Standard Scaler (Z-score normalization)."""
+    total_features = len(x_data[0])
+    means = []
+    stds = []
+
+    for feature_index in range(total_features):
+        column_values = [row[feature_index] for row in x_data]
+        mean = float(np.mean(column_values))
+        std = float(np.std(column_values))
+        if std == 0.0:
+            std = 1.0  # Prevent division by zero
+        means.append(mean)
+        stds.append(std)
+
+    return {
+        "mean": means,
+        "std": stds,
+    }
+
+
+def transform_standard_scaler(x_data: list[list[float]], scaler: dict) -> list[list[float]]:
+    """Transform data menggunakan StandardScaler (Z-score)."""
+    scaled_data = []
+
+    for row in x_data:
+        scaled_row = []
+        for i, value in enumerate(row):
+            mean_value = scaler["mean"][i]
+            std_value = scaler["std"][i]
+            scaled_value = (value - mean_value) / std_value
+            scaled_row.append(scaled_value)
+        scaled_data.append(scaled_row)
+
+    return scaled_data
+
+
+
+# =====================================================================
 # FIT / TRANSFORM TARGET SCALER
 # =====================================================================
 

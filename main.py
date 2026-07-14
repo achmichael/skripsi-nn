@@ -13,6 +13,8 @@ from src.pipeline.preprocessing import (
     train_test_split,
     fit_minmax_scaler,
     transform_minmax,
+    fit_standard_scaler,
+    transform_standard_scaler,
     fit_target_scaler,
     transform_target,
     inverse_transform_target,
@@ -390,9 +392,9 @@ def run_training(model_type: str):
     print(f"Train: {len(x_train)}, Test: {len(x_test)}\n")
 
     # Scale
-    x_scaler = fit_minmax_scaler(x_train)
-    x_train_scaled = transform_minmax(x_train, x_scaler)
-    x_test_scaled = transform_minmax(x_test, x_scaler)
+    x_scaler = fit_standard_scaler(x_train)
+    x_train_scaled = transform_standard_scaler(x_train, x_scaler)
+    x_test_scaled = transform_standard_scaler(x_test, x_scaler)
 
     y_scaler = fit_target_scaler(y_train, use_log=cfg.get("use_log_transform", False))
     y_train_scaled = transform_target(y_train, y_scaler)
@@ -416,6 +418,7 @@ def run_training(model_type: str):
             seed=42,
             clip_value=cfg["clip_value"],
             l2_lambda=cfg.get("l2_lambda", 0.0),
+            asymmetric_alpha=cfg.get("asymmetric_alpha", 0.5),
         )
 
     # Train
