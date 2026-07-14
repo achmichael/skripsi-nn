@@ -4,13 +4,13 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [32,],
-        "learning_rate": 0.005,
-        "patience": 25,
+        "hidden_layers": [64, 32],
+        "learning_rate": 0.01,
+        "patience": 8,
         "min_delta": 1e-5,
-        "clip_value": 5.0,
+        "clip_value": 1.0,
         "batch_size": 16,
-        "l2_lambda": 1e-3,         # tambahkan L2 — belum ada di config prabayar!
+        "l2_lambda": 1e-2,         # tambahkan L2 — belum ada di config prabayar!
         "lr_decay": 0.001,         # tambahkan LR decay
         "target_label": "durasi token (hari)",
         "target": "Token_Habis_Dalam_Hari",
@@ -21,14 +21,35 @@ config = {
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
-        "hidden_layers": [64, 32],
-        "learning_rate": 0.005,
-
-        "patience": 30,
+        "hidden_layers": [32, 32],
+        "learning_rate": 0.05,            
+        "patience": 8,
         "min_delta": 1e-5,
-        "clip_value": 5.0,
+        "clip_value": 1.0,
         "batch_size": 16,
         "l2_lambda": 1e-3,
+        "lr_decay": 0.001,
+        "target_label": "estimasi biaya (Rp)",
+        # "target": "Tagihan_Bulan_Terakhir_Rp",
+        "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
+        "use_log_transform": False,
+    },
+    "pascabayar_place_value": {
+        "dataset_path": "data/pascabayar.csv",
+        "model_path": "results/pascabayar_place_value/models/model_pascabayar_place_value.json",
+        "metrics_dir": "results/pascabayar_place_value/metrics",
+        "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
+        # "hidden_layers": [32, 32],
+        "learning_rate": 0.05,
+
+        "patience": 40,
+        "min_delta": 1e-5,
+        # nilai threshold maksimal untuk pembaruan gradient selama proses backpropagation, karena terkadang nilai gradien bisa sangat besar secara tiba tiba (exploding gradient)
+        "clip_value": 1.0,
+        "batch_size": 16,
+        # nilai penalti untuk bobot yang terlalu besar
+        "l2_lambda": 0.001,
+        # nilai pengurangan learning rate
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
         # "target": "Tagihan_Bulan_Terakhir_Rp",
@@ -44,33 +65,22 @@ config = {
             "Frekuensi_Isi_Token_Per_Bulan",
 
             "Kulkas_Jumlah",
-            # "Kulkas_Kategori",             # PRUNED: redundant with JamPerHari
-            # "Kulkas_EstimasiWattPerUnit",  # PRUNED: redundant with kWhPerHari
             "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
 
             "TV_Jumlah",
-            # "TV_Kategori",                 # PRUNED: redundant with JamPerHari
-            # "TV_EstimasiWattPerUnit",      # PRUNED: redundant with kWhPerHari
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
 
             "AC_Jumlah",
-            # "AC_PK_Kategori",              # PRUNED: redundant with WattPerUnit
-            # "AC_Kategori",                 # PRUNED: redundant with JamPerHari
-            # "AC_EstimasiWattPerUnit",      # PRUNED: redundant with kWhPerHari
             "AC_EstimasiJamPerHari",
             "AC_Energi_kWhPerHari",
 
             "Kipas_Jumlah",
-            # "Kipas_Kategori",              # PRUNED: redundant with JamPerHari
-            # "Kipas_EstimasiWattPerUnit",   # PRUNED: redundant with kWhPerHari
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
 
             "RiceCooker_Jumlah",
-            # "RiceCooker_Kategori",             # PRUNED: redundant with JamPerHari
-            # "RiceCooker_EstimasiWattPerUnit",  # PRUNED: redundant with kWhPerHari
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
 
@@ -83,50 +93,10 @@ config = {
 
             "Alat_Lain_Ada",
 
-            # Alat_Lain_1_Jenis: one-hot nominal (tidak ada urutan antar jenis alat)
-            # "Alat_Lain_1_Jenis__Charger HP/perangkat kecil",
-            # "Alat_Lain_1_Jenis__Blender/Mixer",
-            # "Alat_Lain_1_Jenis__Setrika",
-            # "Alat_Lain_1_Jenis__Dispenser",
-            # "Alat_Lain_1_Jenis__Komputer/Laptop",
-            # "Alat_Lain_1_Jenis__Pompa air",
-            # "Alat_Lain_1_Jenis__Oven/Microwave",
-            # "Alat_Lain_1_Jenis__Lainnya",
-            # "Alat_Lain_1_Jumlah",
-            # "Alat_Lain_1_Kategori",
-            # "Alat_Lain_1_EstimasiWatt",
-
-            # # Alat_Lain_2_Jenis: one-hot nominal
-            # "Alat_Lain_2_Jenis__Charger HP/perangkat kecil",
-            # "Alat_Lain_2_Jenis__Blender/Mixer",
-            # "Alat_Lain_2_Jenis__Setrika",
-            # "Alat_Lain_2_Jenis__Dispenser",
-            # "Alat_Lain_2_Jenis__Komputer/Laptop",
-            # "Alat_Lain_2_Jenis__Pompa air",
-            # "Alat_Lain_2_Jenis__Oven/Microwave",
-            # "Alat_Lain_2_Jenis__Lainnya",
-            # "Alat_Lain_2_Jumlah",
-            # "Alat_Lain_2_Kategori",
-            # "Alat_Lain_2_EstimasiWatt",
-
-            # # Alat_Lain_3_Jenis: one-hot nominal
-            # "Alat_Lain_3_Jenis__Charger HP/perangkat kecil",
-            # "Alat_Lain_3_Jenis__Blender/Mixer",
-            # "Alat_Lain_3_Jenis__Setrika",
-            # "Alat_Lain_3_Jenis__Dispenser",
-            # "Alat_Lain_3_Jenis__Komputer/Laptop",
-            # "Alat_Lain_3_Jenis__Pompa air",
-            # "Alat_Lain_3_Jenis__Oven/Microwave",
-            # "Alat_Lain_3_Jenis__Lainnya",
-            # "Alat_Lain_3_Jumlah",
-            # "Alat_Lain_3_Kategori",
-            # "Alat_Lain_3_EstimasiWatt",
-
             "Total_Energi_Alat_Lain_kWhPerHari",
             "Total_Energi_Utama_kWhPerHari",
             "Total_Energi_Semua_kWhPerHari",
             
-            # === ENGINEERED FEATURES ===
             "Tarif_PLN_Eksak_Rp",
             "Estimasi_kWh_Didapat",
             "Estimasi_Fisika_Durasi_Hari",
@@ -142,65 +112,89 @@ config = {
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
             "Status_Subsidi_Listrik",
-            
-            # --- LEAKAGE DROPPED ---
-            # "Pemakaian_Bulan_Terakhir_kWh" dihapus karena membocorkan target secara langsung
-            # "Pemakaian_Rata_Rata_3Bulan_kWh" dihapus karena korelasinya terlalu tinggi (0.77) dengan target
-            
-            # "Jumlah_Bulan_Tagihan_Terisi" dihapus — ZERO VARIANCE (seluruh data = 3)
-            # "Jumlah_Bulan_kWh_Terisi" dihapus (Korelasi 1.0 dengan Jumlah_Bulan_Tagihan_Terisi)
-            
-            # Tagihan_Relatif_Stabil → cukup 1 kolom (2 kolom one-hot = perfectly complementary)
             "Tagihan_Relatif_Stabil__Ya, relatif stabil",
 
             "Kulkas_Jumlah",
-            # "Kulkas_Kategori" dihapus (Korelasi >0.92 dengan Kulkas_EstimasiWattPerUnit)
             "Kulkas_EstimasiWattPerUnit",
             "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
 
             "TV_Jumlah",
-            # "TV_Kategori" dihapus (Korelasi >0.97 dengan TV_EstimasiJamPerHari)
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
 
             "AC_Jumlah",
-            # "AC_PK_Kategori" dihapus (Korelasi >0.93 dengan AC_EstimasiWattPerUnit)
-            # "AC_Kategori" dihapus (Korelasi >0.96 dengan AC_EstimasiJamPerHari)
             "AC_EstimasiWattPerUnit",
             "AC_EstimasiJamPerHari",
             "AC_Energi_kWhPerHari",
 
             "Kipas_Jumlah",
-            # "Kipas_Kategori" dihapus (Korelasi >0.97 dengan Kipas_EstimasiJamPerHari)
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
 
             "RiceCooker_Jumlah",
-            # "RiceCooker_Kategori" dihapus (Korelasi >0.97 dengan RiceCooker_EstimasiJamPerHari)
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
 
             "MesinCuci_Jumlah",
-            # "MesinCuci_Kategori" dihapus (Korelasi >0.99 dengan MesinCuci_EstimasiFrekuensiPerMinggu)
             "MesinCuci_EstimasiFrekuensiPerMinggu",
             "MesinCuci_Energi_kWhPerHari",
 
             "Alat_Lain_Ada",
 
             "Total_Energi_Alat_Lain_kWhPerHari",
-            # "Total_Energi_Utama_kWhPerHari" dihapus (Korelasi >0.99 dengan Total_Energi_Semua_kWhPerHari)
             "Total_Energi_Semua_kWhPerHari",
 
             "Total_Energi_Semua_kWhPerBulan",
             "Estimasi_Tarif_Per_kWh_Rp",
 
-            # === ENGINEERED FEATURES ===
-            # Interaksi tarif × konsumsi — sinyal terkuat untuk prediksi biaya
             "Estimasi_Biaya_Energi_Bulanan_Rp",
-            # Interaksi daya × konsumsi — proxy kapasitas pemakaian sebenarnya  
             "Daya_x_TotalEnergi",
-            # Estimator biaya berdasarkan aturan PLN + PPJ
+            "Estimasi_Fisika_Tagihan_Rp",
+        ],
+        "pascabayar_place_value": [
+            "Jumlah_Anggota_Keluarga",
+            "Daya_Listrik_Rumah_VA",
+            "Status_Subsidi_Listrik",
+            
+            "Tagihan_Relatif_Stabil__Ya, relatif stabil",
+
+            "Kulkas_Jumlah",
+            "Kulkas_EstimasiWattPerUnit",
+            "Kulkas_EstimasiJamPerHari",
+            "Kulkas_Energi_kWhPerHari",
+
+            "TV_Jumlah",
+            "TV_EstimasiJamPerHari",
+            "TV_Energi_kWhPerHari",
+
+            "AC_Jumlah",
+            "AC_EstimasiWattPerUnit",
+            "AC_EstimasiJamPerHari",
+            "AC_Energi_kWhPerHari",
+
+            "Kipas_Jumlah",
+            "Kipas_EstimasiJamPerHari",
+            "Kipas_Energi_kWhPerHari",
+
+            "RiceCooker_Jumlah",
+            "RiceCooker_EstimasiJamPerHari",
+            "RiceCooker_Energi_kWhPerHari",
+
+            "MesinCuci_Jumlah",
+            "MesinCuci_EstimasiFrekuensiPerMinggu",
+            "MesinCuci_Energi_kWhPerHari",
+
+            "Alat_Lain_Ada",
+
+            "Total_Energi_Alat_Lain_kWhPerHari",
+            "Total_Energi_Semua_kWhPerHari",
+
+            "Total_Energi_Semua_kWhPerBulan",
+            "Estimasi_Tarif_Per_kWh_Rp",
+
+            "Estimasi_Biaya_Energi_Bulanan_Rp",
+            "Daya_x_TotalEnergi",
             "Estimasi_Fisika_Tagihan_Rp",
         ],
     },

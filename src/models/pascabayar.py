@@ -56,7 +56,11 @@ class PascabayarModel(NeuralNetwork):
         for l in range(self.num_layers - 1):
             is_output_layer = (l == self.num_layers - 2)
             
-            z = np.dot(current, self.weights[l].T) + self.biases[l]
+            if is_output_layer:
+                z = np.dot(current, self.weights[l].T)
+            else:
+                z = np.dot(current, self.weights[l].T) + self.biases[l]
+                
             self._pre_activations.append(z)
             
             a = z if is_output_layer else relu(z)
@@ -116,7 +120,6 @@ class PascabayarModel(NeuralNetwork):
         learning_rate: float,
     ) -> float:
         batch_size = x_batch.shape[0]
-
         prediction = self.forward(x_batch)
         if y_batch.ndim == 1:
             y_batch = y_batch.reshape(-1, 1)
