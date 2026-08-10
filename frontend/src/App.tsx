@@ -1,358 +1,506 @@
-import { useState, useCallback, useMemo } from "react";
-import type {
-  ModelType,
-  FormData,
-  PredictionResponse,
-  ValidationErrors,
-  FieldConfig,
-} from "./types/prediction";
-import { prepaidFields, prepaidSections } from "./data/prepaidFields";
-import { postpaidFields, postpaidSections } from "./data/postpaidFields";
+import { useState, useCallback } from "react";
+import type { ModelType, PredictionResponse } from "./types/prediction";
+import type { UIState } from "./types/ui";
 import { predictPrepaid, predictPostpaid } from "./services/predictionApi";
+
 import Header from "./components/Header";
 import ModelSelector from "./components/ModelSelector";
-import FormSection from "./components/FormSection";
-import FormField from "./components/FormField";
-import { validateAllFields } from "./utils/validation";
-import PredictionActions from "./components/PredictionActions";
 import ResultCard from "./components/ResultCard";
+import WizardStepper from "./components/WizardStepper";
+import ApplianceCard from "./components/ApplianceCard";
+import EnergySummarySidebar from "./components/EnergySummarySidebar";
 
-function buildDefaults(fields: FieldConfig[]): FormData {
-  const data: FormData = {};
-  for (const f of fields) {
-    if (f.type === "toggle") data[f.name] = false;
-    else data[f.name] = "";
-  }
-  return data;
-}
+import { 
+  AC_PRESETS, KULKAS_PRESETS, TV_PRESETS, 
+  KIPAS_PRESETS, RICECOOKER_PRESETS, MESINCUCI_PRESETS 
+} from "./data/appliancePresets";
 
-// TODO: Replace local calculation with backend/model value if required.
-function autoCalculate(data: FormData, fields: FieldConfig[]): FormData {
-  const next = { ...data };
-  const fieldNames = new Set(fields.map((f) => f.name));
+import { 
+  Refrigerator, Tv, Snowflake, Fan, 
+  Coffee, WashingMachine, ArrowRight, ArrowLeft 
+} from "lucide-react"; 
 
-  const calc = (prefix: string) => {
-    const jumlah = Number(next[`${prefix}_Jumlah`]) || 0;
-    const watt = Number(next[`${prefix}_EstimasiWattPerUnit`]) || 0;
-    const jam = Number(next[`${prefix}_EstimasiJamPerHari`]) || 0;
-    if (jumlah > 0 && watt > 0 && jam > 0) {
-      const energi = (jumlah * watt * jam) / 1000;
-      const key = `${prefix}_Energi_kWhPerHari`;
-      if (fieldNames.has(key) && (next[key] === "" || next[key] === 0)) {
-        next[key] = Math.round(energi * 100) / 100;
-      }
-    }
-  };
+const defaultAppliance = { jumlah: 0, watt: 0, jam: 0 };
+const defaultMesinCuci = { ...defaultAppliance, frekuensiPerMinggu: 0, kategori: "" };
 
-  calc("Kulkas");
-  calc("TV");
-  calc("AC");
-  calc("Kipas");
-  calc("RiceCooker");
+const getInitialUIState = (): UIState => ({
+  anggotaKeluarga: "",
+  dayaRumahVA: "",
+  statusSubsidi: "",
+  
+  nominalTokenTerakhir: "",
+  frekuensiIsiToken: "",
+  tokenNominalKategori: "",
+  mesinCuciKategori: "",
+  
+  tagihanStabil: "",
 
-  const mcJumlah = Number(next["MesinCuci_Jumlah"]) || 0;
-  const mcWatt = Number(next["MesinCuci_EstimasiWattPerUnit"]) || 0;
-  const mcFreq = Number(next["MesinCuci_EstimasiFrekuensiPerMinggu"]) || 0;
-  const mcDurasi = Number(next["MesinCuci_EstimasiDurasiSekaliPakaiJam"]) || 0;
-  if (mcJumlah > 0 && mcFreq > 0) {
-    const watt = mcWatt > 0 ? mcWatt : 0;
-    const durasi = mcDurasi > 0 ? mcDurasi : 1;
-    const energi = (mcJumlah * watt * mcFreq * durasi) / (7 * 1000);
-    const key = "MesinCuci_Energi_kWhPerHari";
-    if (fieldNames.has(key) && (next[key] === "" || next[key] === 0)) {
-      next[key] = Math.round(energi * 100) / 100;
-    }
-  }
+  kulkas: { ...defaultAppliance, isCustomWatt: false, watt: KULKAS_PRESETS[0].watt },
+  tv: { ...defaultAppliance, isCustomWatt: false, watt: TV_PRESETS[0].watt },
+  ac: { ...defaultAppliance, isCustomWatt: false, watt: AC_PRESETS[0].watt },
+  kipas: { ...defaultAppliance, isCustomWatt: false, watt: KIPAS_PRESETS[0].watt },
+  ricecooker: { ...defaultAppliance, isCustomWatt: false, watt: RICECOOKER_PRESETS[0].watt },
+  mesincuci: { ...defaultMesinCuci, isCustomWatt: false, watt: MESINCUCI_PRESETS[0].watt },
 
-  const mainDevices = [
-    "Kulkas",
-    "TV",
-    "AC",
-    "Kipas",
-    "RiceCooker",
-    "MesinCuci",
-  ];
-  let totalMain = 0;
-  for (const d of mainDevices) {
-    totalMain += Number(next[`${d}_Energi_kWhPerHari`]) || 0;
-  }
-
-  let totalAlatLain = 0;
-  for (let i = 1; i <= 3; i++) {
-    const w = Number(next[`Alat_Lain_${i}_EstimasiWatt`]) || 0;
-    const j = Number(next[`Alat_Lain_${i}_Jumlah`]) || 0;
-    if (w > 0 && j > 0) totalAlatLain += (j * w * 2) / 1000;
-  }
-
-  if (
-    fieldNames.has("Total_Energi_Alat_Lain_kWhPerHari") &&
-    (next["Total_Energi_Alat_Lain_kWhPerHari"] === "" ||
-      next["Total_Energi_Alat_Lain_kWhPerHari"] === 0)
-  ) {
-    next["Total_Energi_Alat_Lain_kWhPerHari"] =
-      Math.round(totalAlatLain * 100) / 100;
-  }
-  if (
-    fieldNames.has("Total_Energi_Utama_kWhPerHari") &&
-    (next["Total_Energi_Utama_kWhPerHari"] === "" ||
-      next["Total_Energi_Utama_kWhPerHari"] === 0)
-  ) {
-    next["Total_Energi_Utama_kWhPerHari"] = Math.round(totalMain * 100) / 100;
-  }
-
-  const totalAll = totalMain + totalAlatLain;
-  if (
-    fieldNames.has("Total_Energi_Semua_kWhPerHari") &&
-    (next["Total_Energi_Semua_kWhPerHari"] === "" ||
-      next["Total_Energi_Semua_kWhPerHari"] === 0)
-  ) {
-    next["Total_Energi_Semua_kWhPerHari"] = Math.round(totalAll * 100) / 100;
-  }
-  if (
-    fieldNames.has("Total_Energi_Semua_kWhPerBulan") &&
-    (next["Total_Energi_Semua_kWhPerBulan"] === "" ||
-      next["Total_Energi_Semua_kWhPerBulan"] === 0)
-  ) {
-    next["Total_Energi_Semua_kWhPerBulan"] =
-      Math.round(totalAll * 30 * 100) / 100;
-  }
-
-  return next;
-}
+  alatLainAda: false,
+  alatLainTotalWatt: 0,
+  alatLainTotalJam: 0,
+});
 
 export default function App() {
   const [modelType, setModelType] = useState<ModelType>("prepaid");
-  const [prepaidData, setPrepaidData] = useState<FormData>(() =>
-    buildDefaults(prepaidFields),
-  );
-  const [postpaidData, setPostpaidData] = useState<FormData>(() =>
-    buildDefaults(postpaidFields),
-  );
-  const [errors, setErrors] = useState<ValidationErrors>({});
+  const [uiState, setUiState] = useState<UIState>(getInitialUIState());
+  
+  const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
-  const [predictionResult, setPredictionResult] =
-    useState<PredictionResponse | null>(null);
+  const [predictionResult, setPredictionResult] = useState<PredictionResponse | null>(null);
   const [predictionError, setPredictionError] = useState<string | null>(null);
-  const [openSections, setOpenSections] = useState<Set<string>>(
-    new Set(["customer"]),
-  );
-
-  const fields = modelType === "prepaid" ? prepaidFields : postpaidFields;
-  const sections = modelType === "prepaid" ? prepaidSections : postpaidSections;
-  const formData = modelType === "prepaid" ? prepaidData : postpaidData;
-  const setFormData =
-    modelType === "prepaid" ? setPrepaidData : setPostpaidData;
 
   const handleModelChange = useCallback((type: ModelType) => {
     setModelType(type);
-    setErrors({});
     setPredictionResult(null);
     setPredictionError(null);
-    setOpenSections(new Set(["customer"]));
   }, []);
 
-  const handleFieldChange = useCallback(
-    (name: string, value: string | number | boolean) => {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-      setErrors((prev) => {
-        if (!prev[name]) return prev;
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
-    },
-    [setFormData],
-  );
+  const handleChange = (field: keyof UIState, value: any) => {
+    setUiState(prev => ({ ...prev, [field]: value }));
+  };
 
-  const toggleSection = useCallback((id: string) => {
-    setOpenSections((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const mapUIStateToPayload = (state: UIState, type: ModelType) => {
+    const payload: Record<string, string | number | boolean> = {};
 
-  const filledCount = useMemo(() => {
-    let count = 0;
-    for (const f of fields) {
-      const v = formData[f.name];
-      if (v !== "" && v !== undefined && v !== null && v !== false) count++;
-    }
-    return count;
-  }, [fields, formData]);
-
-  const sectionFieldCounts = useMemo(() => {
-    const counts: Record<string, { total: number; filled: number }> = {};
-    for (const s of sections) {
-      counts[s.id] = { total: 0, filled: 0 };
-    }
-    for (const f of fields) {
-      if (f.conditionalOn) {
-        const depVal = formData[f.conditionalOn];
-        if (depVal !== f.conditionalValue) continue;
-      }
-      if (counts[f.section]) {
-        counts[f.section].total++;
-        const v = formData[f.name];
-        if (v !== "" && v !== undefined && v !== null && v !== false) {
-          counts[f.section].filled++;
-        }
-      }
-    }
-    return counts;
-  }, [fields, sections, formData]);
-
-  const handlePredict = useCallback(async () => {
-    const calculated = autoCalculate(formData, fields);
-    setFormData(() => calculated);
-
-    const validationErrors = validateAllFields(fields, calculated);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      const firstErrorField = fields.find((f) => validationErrors[f.name]);
-      if (firstErrorField) {
-        setOpenSections((prev) => new Set([...prev, firstErrorField.section]));
-        setTimeout(() => {
-          document
-            .getElementById(firstErrorField.name)
-            ?.scrollIntoView({ behavior: "smooth", block: "center" });
-        }, 200);
-      }
-      return;
+    const calcKwh = (jumlah: number, watt: number, jam: number) => {
+      return (jumlah * watt * jam) / 1000;
+    };
+    
+    const kulkasKwh = calcKwh(state.kulkas.jumlah, state.kulkas.watt, state.kulkas.jam);
+    const tvKwh = calcKwh(state.tv.jumlah, state.tv.watt, state.tv.jam);
+    const acKwh = calcKwh(state.ac.jumlah, state.ac.watt, state.ac.jam);
+    const kipasKwh = calcKwh(state.kipas.jumlah, state.kipas.watt, state.kipas.jam);
+    const ricecookerKwh = calcKwh(state.ricecooker.jumlah, state.ricecooker.watt, state.ricecooker.jam);
+    
+    let mesinCuciKwh = 0;
+    if (state.mesincuci.jumlah > 0 && state.mesincuci.frekuensiPerMinggu > 0) {
+      const watt = state.mesincuci.watt > 0 ? state.mesincuci.watt : 0;
+      const durasi = state.mesincuci.jam > 0 ? state.mesincuci.jam : 1;
+      mesinCuciKwh = (state.mesincuci.jumlah * watt * state.mesincuci.frekuensiPerMinggu * durasi) / (7 * 1000);
     }
 
+    let alatLainKwh = 0;
+    if (state.alatLainAda) {
+      alatLainKwh = (state.alatLainTotalWatt * state.alatLainTotalJam) / 1000;
+    }
+
+    const totalUtama = kulkasKwh + tvKwh + acKwh + kipasKwh + ricecookerKwh + mesinCuciKwh;
+    const totalSemua = totalUtama + alatLainKwh;
+
+    payload["Jumlah_Anggota_Keluarga"] = Number(state.anggotaKeluarga) || 1;
+    payload["Daya_Listrik_Rumah_VA"] = Number(state.dayaRumahVA) || 900;
+    payload["Status_Subsidi_Listrik"] = state.statusSubsidi || "0";
+
+    if (type === "prepaid") {
+      payload["Nominal_Token_Terakhir_Rp"] = Number(state.nominalTokenTerakhir) || 0;
+      payload["Frekuensi_Isi_Token_Per_Bulan"] = Number(state.frekuensiIsiToken) || 0;
+      payload["Token_Nominal_Kategori"] = state.tokenNominalKategori || "0";
+
+      payload["Kulkas_Jumlah"] = state.kulkas.jumlah;
+      payload["Kulkas_EstimasiJamPerHari"] = state.kulkas.jam;
+      payload["Kulkas_Energi_kWhPerHari"] = Math.round(kulkasKwh * 100) / 100;
+
+      payload["TV_Jumlah"] = state.tv.jumlah;
+      payload["TV_EstimasiJamPerHari"] = state.tv.jam;
+      payload["TV_Energi_kWhPerHari"] = Math.round(tvKwh * 100) / 100;
+
+      payload["AC_Jumlah"] = state.ac.jumlah;
+      payload["AC_EstimasiJamPerHari"] = state.ac.jam;
+      payload["AC_Energi_kWhPerHari"] = Math.round(acKwh * 100) / 100;
+
+      payload["Kipas_Jumlah"] = state.kipas.jumlah;
+      payload["Kipas_EstimasiJamPerHari"] = state.kipas.jam;
+      payload["Kipas_Energi_kWhPerHari"] = Math.round(kipasKwh * 100) / 100;
+
+      payload["RiceCooker_Jumlah"] = state.ricecooker.jumlah;
+      payload["RiceCooker_EstimasiJamPerHari"] = state.ricecooker.jam;
+      payload["RiceCooker_Energi_kWhPerHari"] = Math.round(ricecookerKwh * 100) / 100;
+
+      payload["MesinCuci_Jumlah"] = state.mesincuci.jumlah;
+      payload["MesinCuci_Kategori"] = state.mesincuci.kategori || "0";
+      payload["MesinCuci_EstimasiWattPerUnit"] = state.mesincuci.watt;
+      payload["MesinCuci_EstimasiFrekuensiPerMinggu"] = state.mesincuci.frekuensiPerMinggu;
+      payload["MesinCuci_EstimasiDurasiSekaliPakaiJam"] = state.mesincuci.jam;
+      payload["MesinCuci_Energi_kWhPerHari"] = Math.round(mesinCuciKwh * 100) / 100;
+
+      payload["Alat_Lain_Ada"] = state.alatLainAda;
+      payload["Total_Energi_Alat_Lain_kWhPerHari"] = Math.round(alatLainKwh * 100) / 100;
+
+      payload["Total_Energi_Utama_kWhPerHari"] = Math.round(totalUtama * 100) / 100;
+      payload["Total_Energi_Semua_kWhPerHari"] = Math.round(totalSemua * 100) / 100;
+    } else {
+      payload["Tagihan_Relatif_Stabil__Ya, relatif stabil"] = state.tagihanStabil || "0";
+
+      payload["Kulkas_Jumlah"] = state.kulkas.jumlah;
+      payload["Kulkas_EstimasiWattPerUnit"] = state.kulkas.watt;
+      payload["Kulkas_EstimasiJamPerHari"] = state.kulkas.jam;
+      payload["Kulkas_Energi_kWhPerHari"] = Math.round(kulkasKwh * 100) / 100;
+
+      payload["TV_Jumlah"] = state.tv.jumlah;
+      payload["TV_EstimasiJamPerHari"] = state.tv.jam;
+      payload["TV_Energi_kWhPerHari"] = Math.round(tvKwh * 100) / 100;
+
+      payload["AC_Jumlah"] = state.ac.jumlah;
+      payload["AC_EstimasiWattPerUnit"] = state.ac.watt;
+      payload["AC_EstimasiJamPerHari"] = state.ac.jam;
+      payload["AC_Energi_kWhPerHari"] = Math.round(acKwh * 100) / 100;
+
+      payload["Kipas_Jumlah"] = state.kipas.jumlah;
+      payload["Kipas_EstimasiJamPerHari"] = state.kipas.jam;
+      payload["Kipas_Energi_kWhPerHari"] = Math.round(kipasKwh * 100) / 100;
+
+      payload["RiceCooker_Jumlah"] = state.ricecooker.jumlah;
+      payload["RiceCooker_EstimasiJamPerHari"] = state.ricecooker.jam;
+      payload["RiceCooker_Energi_kWhPerHari"] = Math.round(ricecookerKwh * 100) / 100;
+
+      payload["MesinCuci_Jumlah"] = state.mesincuci.jumlah;
+      payload["MesinCuci_EstimasiFrekuensiPerMinggu"] = state.mesincuci.frekuensiPerMinggu;
+      payload["MesinCuci_Energi_kWhPerHari"] = Math.round(mesinCuciKwh * 100) / 100;
+
+      payload["Alat_Lain_Ada"] = state.alatLainAda;
+      payload["Total_Energi_Alat_Lain_kWhPerHari"] = Math.round(alatLainKwh * 100) / 100;
+
+      payload["Total_Energi_Semua_kWhPerHari"] = Math.round(totalSemua * 100) / 100;
+      payload["Total_Energi_Semua_kWhPerBulan"] = Math.round(totalSemua * 30 * 100) / 100;
+      
+      const daya = Number(state.dayaRumahVA);
+      const isSubsidi = state.statusSubsidi === "1";
+      const tarif = daya === 450 ? 415 : (daya <= 900 && isSubsidi ? 605 : (daya <= 900 ? 1352 : 1444));
+      payload["Estimasi_Tarif_Per_kWh_Rp"] = tarif;
+    }
+
+    return payload;
+  };
+
+  const handlePredict = async () => {
     setIsLoading(true);
-    setPredictionResult(null);
     setPredictionError(null);
-
     try {
-      const payload: FormData = {};
-      for (const f of fields) {
-        payload[f.name] = calculated[f.name];
-      }
-
-      const result =
-        modelType === "prepaid"
-          ? await predictPrepaid(payload)
-          : await predictPostpaid(payload);
-
+      const payload = mapUIStateToPayload(uiState, modelType);
+      const result = modelType === "prepaid" 
+        ? await predictPrepaid(payload as any)
+        : await predictPostpaid(payload as any);
+        
       setPredictionResult(result);
-      setTimeout(() => {
-        document
-          .getElementById("result-card")
-          ?.scrollIntoView({ behavior: "smooth", block: "center" });
-      }, 100);
+      // Auto scroll to top on success
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
-      console.error("Prediction failed:", err);
       setPredictionError("Terjadi kesalahan saat memproses prediksi.");
     } finally {
       setIsLoading(false);
     }
-  }, [formData, fields, modelType, setFormData]);
+  };
 
-  const handleReset = useCallback(() => {
-    const hasFilledData = filledCount > 3;
-    if (hasFilledData && !window.confirm("Reset semua data form?")) return;
+  // Views
+  const renderStep1 = () => (
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <h2 className="text-xl font-bold text-slate-800 mb-6">Profil Rumah</h2>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Daya Listrik Rumah (VA)</label>
+            <select 
+              value={uiState.dayaRumahVA}
+              onChange={(e) => handleChange("dayaRumahVA", e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+            >
+              <option value="">Pilih Daya</option>
+              <option value="450">450 VA</option>
+              <option value="900">900 VA</option>
+              <option value="1300">1300 VA</option>
+              <option value="2200">2200 VA</option>
+              <option value="3500">3500 VA</option>
+              <option value="5500">5500 VA</option>
+            </select>
+          </div>
+          
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Status Subsidi</label>
+            <select 
+              value={uiState.statusSubsidi}
+              onChange={(e) => handleChange("statusSubsidi", e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+            >
+              <option value="">Pilih Status</option>
+              <option value="0">Non-Subsidi</option>
+              <option value="1">Subsidi</option>
+            </select>
+          </div>
 
-    setFormData(() => buildDefaults(fields));
-    setErrors({});
-    setPredictionResult(null);
-    setPredictionError(null);
-    setOpenSections(new Set(["customer"]));
-  }, [fields, filledCount, setFormData]);
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Jumlah Anggota Keluarga</label>
+            <input 
+              type="number" 
+              min="1"
+              value={uiState.anggotaKeluarga}
+              onChange={(e) => handleChange("anggotaKeluarga", e.target.value)}
+              placeholder="Contoh: 4"
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+            />
+          </div>
+        </div>
+      </div>
 
-  const handleRetry = useCallback(() => {
-    setPredictionError(null);
-    handlePredict();
-  }, [handlePredict]);
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <h2 className="text-xl font-bold text-slate-800 mb-6">
+          {modelType === "prepaid" ? "Riwayat Token Prabayar" : "Riwayat Tagihan Pascabayar"}
+        </h2>
+        
+        {modelType === "prepaid" ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Nominal Token Terakhir (Rp)</label>
+              <input 
+                type="number" 
+                value={uiState.nominalTokenTerakhir}
+                onChange={(e) => handleChange("nominalTokenTerakhir", e.target.value)}
+                placeholder="Contoh: 100000"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Frekuensi Isi (Bulan)</label>
+              <input 
+                type="number" 
+                value={uiState.frekuensiIsiToken}
+                onChange={(e) => handleChange("frekuensiIsiToken", e.target.value)}
+                placeholder="Berapa kali isi sebulan?"
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+              />
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-sm font-semibold text-slate-700">Kategori Nominal Token</label>
+              <select 
+                value={uiState.tokenNominalKategori}
+                onChange={(e) => handleChange("tokenNominalKategori", e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+              >
+                <option value="">Pilih Kategori</option>
+                <option value="0">Rendah (&lt; 50k)</option>
+                <option value="1">Sedang (50k - 100k)</option>
+                <option value="2">Tinggi (&gt; 100k)</option>
+              </select>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-slate-700">Apakah tagihan relatif stabil?</label>
+            <select 
+              value={uiState.tagihanStabil}
+              onChange={(e) => handleChange("tagihanStabil", e.target.value)}
+              className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+            >
+              <option value="">Pilih</option>
+              <option value="1">Ya, Relatif Stabil</option>
+              <option value="0">Tidak, Bervariasi</option>
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 
-  const visibleFieldsForSection = useCallback(
-    (sectionId: string) => {
-      return fields.filter((f) => {
-        if (f.section !== sectionId) return false;
-        if (f.conditionalOn) {
-          return formData[f.conditionalOn] === f.conditionalValue;
-        }
-        return true;
-      });
-    },
-    [fields, formData],
+  const renderStep2 = () => (
+    <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-500">
+      <ApplianceCard 
+        title="Televisi" icon={<Tv className="w-6 h-6" />} state={uiState.tv} presets={TV_PRESETS}
+        onChange={(val) => handleChange("tv", val)}
+      />
+      <ApplianceCard 
+        title="Kulkas" icon={<Refrigerator className="w-6 h-6" />} state={uiState.kulkas} presets={KULKAS_PRESETS}
+        onChange={(val) => handleChange("kulkas", val)}
+      />
+      <ApplianceCard 
+        title="AC (Air Conditioner)" icon={<Snowflake className="w-6 h-6" />} state={uiState.ac} presets={AC_PRESETS}
+        onChange={(val) => handleChange("ac", val)}
+      />
+      <ApplianceCard 
+        title="Kipas Angin" icon={<Fan className="w-6 h-6" />} state={uiState.kipas} presets={KIPAS_PRESETS}
+        onChange={(val) => handleChange("kipas", val)}
+      />
+      <ApplianceCard 
+        title="Rice Cooker" icon={<Coffee className="w-6 h-6" />} state={uiState.ricecooker} presets={RICECOOKER_PRESETS}
+        onChange={(val) => handleChange("ricecooker", val)}
+      />
+      
+      {/* Mesin cuci butuh config tambahan */}
+      <div className={`p-5 rounded-3xl border transition-all duration-300 ${uiState.mesincuci.jumlah > 0 ? 'bg-white border-teal-200 shadow-[0_8px_30px_rgb(0,0,0,0.04)] ring-1 ring-teal-50' : 'bg-slate-50/50 border-slate-200'}`}>
+        <ApplianceCard 
+          title="Mesin Cuci" icon={<WashingMachine className="w-6 h-6" />} state={uiState.mesincuci} presets={MESINCUCI_PRESETS}
+          onChange={(val) => handleChange("mesincuci", val as any)}
+        />
+        {uiState.mesincuci.jumlah > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Frekuensi (kali/minggu)</label>
+              <input 
+                type="number" value={uiState.mesincuci.frekuensiPerMinggu || ""}
+                onChange={(e) => handleChange("mesincuci", { ...uiState.mesincuci, frekuensiPerMinggu: Number(e.target.value) })}
+                className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700" placeholder="Misal: 3"
+              />
+            </div>
+            {modelType === "prepaid" && (
+              <div className="space-y-2">
+                <label className="text-sm font-semibold text-slate-700">Kategori Mesin Cuci</label>
+                <select 
+                  value={uiState.mesincuci.kategori}
+                  onChange={(e) => handleChange("mesincuci", { ...uiState.mesincuci, kategori: e.target.value })}
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-slate-700"
+                >
+                  <option value="">Pilih</option>
+                  <option value="0">Rendah</option>
+                  <option value="1">Sedang</option>
+                  <option value="2">Tinggi</option>
+                </select>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  const renderStep3 = () => (
+    <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+      <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-bold text-slate-800">Peralatan Lainnya</h2>
+            <p className="text-sm text-slate-500">Apakah ada alat listrik lain yang tidak disebutkan di step sebelumnya?</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" className="sr-only peer" checked={uiState.alatLainAda} onChange={(e) => handleChange("alatLainAda", e.target.checked)} />
+            <div className="w-14 h-7 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-teal-500"></div>
+          </label>
+        </div>
+
+        {uiState.alatLainAda && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-slate-100 animate-in fade-in zoom-in-95 duration-300">
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Total Watt Semua Alat Lain</label>
+              <div className="relative">
+                <input 
+                  type="number" value={uiState.alatLainTotalWatt || ""}
+                  onChange={(e) => handleChange("alatLainTotalWatt", Number(e.target.value))}
+                  placeholder="Misal: 500"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Watt</span>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-700">Rata-rata Durasi/Hari</label>
+              <div className="relative">
+                <input 
+                  type="number" value={uiState.alatLainTotalJam || ""}
+                  onChange={(e) => handleChange("alatLainTotalJam", Number(e.target.value))}
+                  placeholder="Misal: 4"
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500"
+                />
+                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-medium">Jam</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {predictionResult && (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <ResultCard
+            modelType={modelType}
+            result={predictionResult}
+            error={predictionError}
+            onRetry={handlePredict}
+            filledCount={10}
+            totalCount={10}
+          />
+        </div>
+      )}
+    </div>
   );
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-slate-50/50 pb-20 font-sans selection:bg-teal-500/30">
       <Header />
 
       <div className="mx-auto max-w-6xl px-5 sm:px-8">
         {/* hero */}
-        <div className="pb-8 pt-10 sm:pt-14">
-          <p className="font-mono text-[11px] tracking-[0.2em] text-copper">
-            FORM PENGUKURAN
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+        <div className="pb-8 pt-10 sm:pt-14 text-center max-w-2xl mx-auto">
+          <div className="inline-flex items-center justify-center px-3 py-1 rounded-full bg-teal-50 text-teal-600 font-medium text-xs tracking-wider mb-4 border border-teal-100">
+            Kalkulator Cerdas
+          </div>
+          <h1 className="font-display text-4xl sm:text-5xl font-extrabold tracking-tight text-slate-900 mb-4">
             Prediksi Konsumsi Listrik
           </h1>
-          <p className="mt-2 max-w-lg text-[14px] leading-relaxed text-muted">
-            Masukkan data pelanggan dan peralatan rumah tangga untuk mendapatkan
-            estimasi penggunaan listrik.
+          <p className="text-[15px] sm:text-base leading-relaxed text-slate-500">
+            Dapatkan estimasi akurat penggunaan energi rumah Anda. Pilih model langganan dan lengkapi data profil serta peralatan yang Anda gunakan.
           </p>
         </div>
 
-        <ModelSelector modelType={modelType} onChange={handleModelChange} />
+        <div className="flex justify-center mb-10">
+          <ModelSelector modelType={modelType} onChange={handleModelChange} />
+        </div>
 
-        <div className="mt-8 flex flex-col gap-10 lg:flex-row">
-          <div className="min-w-0 flex-1 rounded-lg border border-line bg-panel px-5">
-            {sections.map((section, i) => {
-              const sectionFields = visibleFieldsForSection(section.id);
-              const counts = sectionFieldCounts[section.id] ?? {
-                total: 0,
-                filled: 0,
-              };
-              return (
-                <FormSection
-                  key={section.id}
-                  id={section.id}
-                  title={section.title}
-                  index={i + 1}
-                  fieldCount={counts.total}
-                  filledCount={counts.filled}
-                  isOpen={openSections.has(section.id)}
-                  onToggle={() => toggleSection(section.id)}
+        <div className="flex flex-col lg:flex-row gap-8 lg:gap-12 relative">
+          
+          <div className="min-w-0 flex-1">
+            <WizardStepper 
+              currentStep={currentStep} 
+              steps={["Profil Rumah", "Peralatan Utama", "Alat Lain & Hasil"]} 
+            />
+
+            <div className="mb-8">
+              {currentStep === 1 && renderStep1()}
+              {currentStep === 2 && renderStep2()}
+              {currentStep === 3 && renderStep3()}
+            </div>
+
+            <div className="flex items-center justify-between pt-6 border-t border-slate-200/60">
+              <button
+                onClick={() => setCurrentStep(prev => Math.max(1, prev - 1))}
+                className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-bold text-sm transition-all
+                  ${currentStep === 1 
+                    ? 'opacity-0 invisible' 
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'}`}
+              >
+                <ArrowLeft className="w-4 h-4" /> Kembali
+              </button>
+              
+              {currentStep < 3 ? (
+                <button
+                  onClick={() => setCurrentStep(prev => Math.min(3, prev + 1))}
+                  className="flex items-center gap-2 px-8 py-3 rounded-2xl font-bold text-sm bg-slate-900 text-white hover:bg-slate-800 shadow-md shadow-slate-900/20 transition-all hover:translate-x-1"
                 >
-                  {sectionFields.map((field) => (
-                    <FormField
-                      key={field.name}
-                      field={field}
-                      value={formData[field.name] ?? ""}
-                      error={errors[field.name]}
-                      onChange={handleFieldChange}
-                    />
-                  ))}
-                </FormSection>
-              );
-            })}
-            <div className="pb-6 pt-6">
-              <PredictionActions
-                isLoading={isLoading}
-                onPredict={handlePredict}
-                onReset={handleReset}
-              />
+                  Lanjut <ArrowRight className="w-4 h-4" />
+                </button>
+              ) : (
+                <button
+                  onClick={handlePredict}
+                  disabled={isLoading}
+                  className="flex items-center gap-2 px-8 py-3 rounded-2xl font-bold text-sm bg-teal-600 text-white hover:bg-teal-700 shadow-lg shadow-teal-500/30 transition-all hover:-translate-y-0.5 disabled:opacity-70 disabled:hover:translate-y-0"
+                >
+                  {isLoading ? 'Memproses...' : 'Lihat Prediksi'} 
+                  {!isLoading && <ArrowRight className="w-4 h-4" />}
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="w-full shrink-0 lg:w-[280px]">
-            <div className="lg:sticky lg:top-6">
-              <ResultCard
-                modelType={modelType}
-                result={predictionResult}
-                error={predictionError}
-                onRetry={handleRetry}
-                filledCount={filledCount}
-                totalCount={fields.length}
-              />
+          {/* Sticky Sidebar */}
+          <div className="w-full lg:w-[320px] shrink-0">
+            <div className="lg:sticky lg:top-8">
+              <EnergySummarySidebar uiState={uiState} modelType={modelType} />
             </div>
           </div>
+
         </div>
       </div>
     </div>
