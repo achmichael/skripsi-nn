@@ -1,0 +1,108 @@
+@import url("https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Big Shoulders Display", "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+
+  /* panel-listrik palette */
+  --color-ink: #16241d;
+  --color-paper: #f4f6f0;
+  --color-panel: #ffffff;
+  --color-copper: #b5651d;
+  --color-copper-light: #d98a46;
+  --color-brass: #c9a227;
+  --color-circuit: #1f4d3a;
+  --color-circuit-light: #2b6b4f;
+  --color-line: #e1e4da;
+  --color-muted: #67715f;
+  --color-lcd: #14241c;
+  --color-lcd-fg: #f5b94a;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  body {
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+  input,
+  select,
+  textarea {
+    font-family: var(--font-mono);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-copper);
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* channel tag, e.g. CH.01 */
+  .channel-tag {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 22px;
+    padding: 0 7px;
+    border-radius: 3px;
+    border: 1px solid var(--color-copper);
+    color: var(--color-copper);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    flex-shrink: 0;
+  }
+  .channel-tag.is-done {
+    background: var(--color-circuit);
+    border-color: var(--color-circuit);
+    color: #eaf3ec;
+  }
+  .channel-tag.is-open {
+    background: var(--color-ink);
+    border-color: var(--color-ink);
+    color: var(--color-paper);
+  }
+
+  /* physical-feeling buttons */
+  .btn-press {
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+  }
+  .btn-press:active {
+    transform: translateY(1px);
+  }
+
+  .lcd-screen {
+    background: var(--color-lcd);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      rgba(245, 185, 74, 0.035) 0px,
+      rgba(245, 185, 74, 0.035) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    border-radius: 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

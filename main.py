@@ -400,6 +400,17 @@ def run_training(model_type: str):
     y_train_scaled = transform_target(y_train, y_scaler)
     y_test_scaled = transform_target(y_test, y_scaler)
 
+    # Logging sample data preprocessed
+    print("\n--- SAMPLE DATA PREPROCESSED (3 Baris Pertama) ---")
+    for i in range(min(3, len(x_train_scaled))):
+        print(f"\n[BARIS {i+1}]")
+        print("  [FITUR]")
+        for j, col_name in enumerate(feature_columns):
+            print(f"    {col_name}: {x_train_scaled[i][j]:.4f}")
+        print("  [TARGET]")
+        print(f"    {target_column}: {y_train_scaled[i]:.4f}")
+    print("-" * 50 + "\n")
+
     # Build layer sizes: [input, ...hidden..., 1]
     layer_sizes = [input_size] + cfg["hidden_layers"] + [1]
     print(f"Arsitektur: {layer_sizes}")

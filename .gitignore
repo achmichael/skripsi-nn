@@ -4,3 +4,4 @@ __pycache__/
 model_*.json
 results/
 *.md
+graphify-out/
