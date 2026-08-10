@@ -1,5 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
-const USE_MOCK_API = true;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
+const USE_MOCK_API = false;
 
 import type { FormData, PredictionResponse } from "../types/prediction";
 

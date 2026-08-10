@@ -25,7 +25,7 @@ config = {
         "hidden_layers": [32, 32],
         "learning_rate": 0.05,            
         "patience": 10,
-        "min_delta": 1e-5,
+        "min_delta": 1e-6,
         "clip_value": 1.0,
         "batch_size": 16,
         "l2_lambda": 1e-3,
