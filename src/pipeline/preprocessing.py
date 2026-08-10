@@ -607,6 +607,7 @@ def inverse_transform_target(value: float, scaler: dict) -> float:
     # print("scaler min", scaler["min"])
     # print("raw", raw)
     if scaler.get("use_log", False):
+        raw = min(raw, 709.0)
         return float(np.expm1(raw))
 
     return raw

@@ -74,7 +74,10 @@ async def predict_prepaid(data: Dict[str, Any]):
     prediction = inverse_transform_target(prediction_scaled, y_scaler)
     
     # Ensure no negative prediction for days
-    prediction = max(0, float(prediction))
+    import math
+    if math.isinf(prediction):
+        prediction = 0.0 # Or max value cap
+    prediction = max(0.0, float(prediction))
     
     return {
         "success": True,
@@ -107,7 +110,10 @@ async def predict_postpaid(data: Dict[str, Any]):
     prediction = inverse_transform_target(prediction_scaled, y_scaler)
     
     # Ensure no negative prediction for cost
-    prediction = max(0, float(prediction))
+    import math
+    if math.isinf(prediction):
+        prediction = 0.0 # Or max value cap
+    prediction = max(0.0, float(prediction))
     
     return {
         "success": True,
