@@ -5,3 +5,4 @@ model_*.json
 results/
 *.md
 graphify-out/
+frontend/*
