@@ -4,14 +4,17 @@ from pydantic import BaseModel
 from typing import Dict, Any
 from contextlib import asynccontextmanager
 import numpy as np
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 from src.pipeline.preprocessing import transform_standard_scaler, inverse_transform_target
 from src.models.pascabayar import PascabayarModel
 from src.models.prabayar import PrabayarModel
 
 MODEL_PATHS = {
-    "prabayar": "results/prabayar/models/model_prabayar.json",
-    "pascabayar": "results/pascabayar/models/model_pascabayar.json",
+    "prabayar": os.path.join(BASE_DIR, "results", "prabayar", "models", "model_prabayar.json"),
+    "pascabayar": os.path.join(BASE_DIR, "results", "pascabayar", "models", "model_pascabayar.json"),
 }
 
 models = {}
