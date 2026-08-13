@@ -8,53 +8,6 @@ from src.activations.ReLU import relu, relu_derivative
 from src.models.neural_network import NeuralNetwork
 from src.pipeline.preprocessing import inverse_transform_target
 
-def compute_sample_weight(
-    y_normalized: float,
-    y_scaler: dict,
-    use_log: bool = False,
-    model_type: str = "pascabayar",
-) -> float:
-    """
-    Compute per-sample loss weight based on the original Rupiah value
-    of the target. Samples with low bill amounts receive higher weight
-    to compensate for their under-representation in the training set.
-
-    Weight scheme:
-      Aktual < 100,000 Rp  → weight = 3.0  (low bill, underrepresented)
-      Aktual < 200,000 Rp  → weight = 1.5  (medium-low, slightly boost)
-      Aktual >= 200,000 Rp → weight = 1.0  (normal, no boost)
-
-    Args:
-        y_normalized : target value in normalized scale (after minmax 
-                       and optional log transform)
-        y_scaler     : scaler dict from fit_target_scaler(), used to 
-                       convert normalized value back to Rupiah
-        use_log      : whether log transform was applied to target,
-                       must match the use_log_transform config value
-
-    Returns:
-        float: sample weight >= 1.0
-    """
-    # Convert normalized → original scale (Rupiah for pascabayar, days for prabayar)
-    y_original = inverse_transform_target(y_normalized, y_scaler)
-
-    if model_type == "pascabayar":
-        if y_original < 100_000:
-            return 2.0
-        elif y_original < 200_000:
-            return 1.5
-        else:
-            return 1.0
-    elif model_type == "prabayar":
-        if y_original <= 10.0:
-            return 2.5
-        elif y_original >= 25.0:
-            return 2.0
-        else:
-            return 1.0
-    
-    return 1.0
-
 def mean_squared_error_single(prediction: float, target: float) -> float:
     error = prediction - target
     return error * error
@@ -91,15 +44,11 @@ def train_model(
     y_val: list[float] | None = None,
     lr_decay: float = 0.0,
     # ── NEW PARAMETERS ──────────────────────────────────────
-    use_sample_weights: bool = False,
-    y_scaler: dict | None = None,
     use_log: bool = False,
     model_type: str = "pascabayar",
     # ────────────────────────────────────────────────────────
 ) -> dict:
     """
-    use_sample_weights : if True, apply per-sample loss weighting based on original Rupiah value
-    y_scaler          : required if use_sample_weights=True, used to inverse-transform for weight lookup
     use_log           : must match use_log_transform config value, passed through to inverse_transform_target
     """
     
@@ -121,21 +70,6 @@ def train_model(
     if has_val:
         X_val_np = np.array(x_val, dtype=np.float32)
         y_val_np = np.array(y_val, dtype=np.float32).reshape(-1, 1)
-
-    if use_sample_weights and y_scaler is not None:
-        w_counts = {1.0: 0, 1.5: 0, 2.0: 0, 2.5: 0}
-        for y_val_i in y_train:
-            w = compute_sample_weight(float(y_val_i), y_scaler, use_log, model_type)
-            w_counts[w] = w_counts.get(w, 0) + 1
-            
-        if model_type == "pascabayar":
-            print(f"[Sample Weights] weight=2.0 (< 100rb) : {w_counts.get(2.0, 0)} samples")
-            print(f"[Sample Weights] weight=1.5 (< 200rb) : {w_counts.get(1.5, 0)} samples")
-            print(f"[Sample Weights] weight=1.0 (>= 200rb): {w_counts.get(1.0, 0)} samples")
-        else:
-            print(f"[Sample Weights] weight=2.5 (<= 10 hari) : {w_counts.get(2.5, 0)} samples")
-            print(f"[Sample Weights] weight=2.0 (>= 25 hari) : {w_counts.get(2.0, 0)} samples")
-            print(f"[Sample Weights] weight=1.0 (normal) : {w_counts.get(1.0, 0)} samples")
 
     while True:
         epoch += 1
@@ -159,22 +93,7 @@ def train_model(
             x_batch = X_shuffled[start:end]
             y_batch = y_shuffled[start:end]
 
-            if use_sample_weights and y_scaler is not None:
-                # Compute per-sample weights for this batch
-                weights = [
-                    compute_sample_weight(
-                        y_normalized=float(y_val_i.item()),
-                        y_scaler=y_scaler,
-                        use_log=use_log,
-                        model_type=model_type,
-                    )
-                    for y_val_i in y_batch
-                ]
-                batch_loss = model.train_batch_weighted(
-                    x_batch, y_batch, current_lr, weights
-                )
-            else:
-                batch_loss = model.train_batch(x_batch, y_batch, current_lr)
+            batch_loss = model.train_batch(x_batch, y_batch, current_lr)
             
             total_train_loss += batch_loss
             n_batches += 1

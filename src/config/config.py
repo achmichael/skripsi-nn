@@ -3,10 +3,10 @@ config = {
         "dataset_path": "data/prabayar.csv",
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
-        "layer_sizes": None,  # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [64, 32],
-        "learning_rate": 0.01,
-        "patience": 8,
+        "layer_sizes": None, # set dynamically: [input, 64, 32, 1]
+        "hidden_layers": [128, 64],
+        "learning_rate": 0.001,
+        "patience": 10,
         "min_delta": 1e-5,
         "clip_value": 1.0,
         "batch_size": 16,
@@ -22,24 +22,24 @@ config = {
         "model_path": "results/pascabayar/models/model_pascabayar.json",
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
-        "hidden_layers": [32, 32],
-        "learning_rate": 0.05,            
+        "hidden_layers": [64],
+        "learning_rate": 0.005,            
         "patience": 10,
-        "min_delta": 1e-5,
-        "clip_value": 1.0,
+        "min_delta": 1e-6,
+        "clip_value": 10.0,
         "batch_size": 16,
-        "l2_lambda": 1e-3,
+        "l2_lambda": 0.01,
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
-        "use_log_transform": False,
+        "use_log_transform": True,
     },
     "pascabayar_place_value": {
         "dataset_path": "data/pascabayar.csv",
         "model_path": "results/pascabayar_place_value/models/model_pascabayar_place_value.json",
         "metrics_dir": "results/pascabayar_place_value/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
-        # "hidden_layers": [32, 32],
+        "hidden_layers": [32, 32],
         "learning_rate": 0.05,
 
         "patience": 40,
@@ -53,7 +53,7 @@ config = {
         "lr_decay": 0.001,
         "target_label": "estimasi biaya (Rp)",
         "target": "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp",
-        "use_log_transform": False,
+        "use_log_transform": True,
     },
     "features": {
         "prabayar": [  
@@ -98,7 +98,7 @@ config = {
             
             "Tarif_PLN_Eksak_Rp",
             "Estimasi_kWh_Didapat",
-            "Estimasi_Fisika_Durasi_Hari",
+            # "Estimasi_Fisika_Durasi_Hari",
             "Durasi_Dari_Frekuensi",
             "Rasio_Token_vs_Energi",
             "Token_Nominal_Kategori",
@@ -149,7 +149,7 @@ config = {
 
             "Estimasi_Biaya_Energi_Bulanan_Rp",
             "Daya_x_TotalEnergi",
-            "Estimasi_Fisika_Tagihan_Rp",
+            # "Estimasi_Fisika_Tagihan_Rp",
         ],
         "pascabayar_place_value": [
             "Jumlah_Anggota_Keluarga",
