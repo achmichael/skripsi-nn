@@ -50,6 +50,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/")
+def root():
+    return {
+        "message": "API Is Running",
+        "status": "success"
+    }
+    
 @app.post("/predict/prepaid")
 async def predict_prepaid(data: Dict[str, Any]):
     if "prabayar" not in models:
