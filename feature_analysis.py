@@ -237,9 +237,17 @@ def analyze(model_type: str):
 
         print(f"\n{'Rank':>4} | {'Fitur':<52} | {'ΔMSE':>14}")
         print("─" * 75)
+        try:
+            max_val = float(max([float(i[1].item()) if hasattr(i[1], 'item') else float(i[1]) for i in imp_results]))
+        except Exception:
+            max_val = 1.0 # fallback
         for rank, (fname, delta) in enumerate(imp_results, 1):
-            bar = "█" * max(1, int(delta / max(i[1] for i in imp_results) * 30)) if max(i[1] for i in imp_results) > 0 and delta > 0 else ""
-            print(f"{rank:>4} | {fname:<52} | {delta:>14.8f} {bar}")
+            try:
+                delta_val = float(delta.item()) if hasattr(delta, 'item') else float(delta)
+            except Exception:
+                delta_val = 0.0
+            bar = "█" * max(1, int(delta_val / max_val * 30)) if max_val > 0 and delta_val > 0 else ""
+            print(f"{rank:>4} | {fname:<52} | {delta_val:>14.8f} {bar}")
     else:
         print(f"\n[INFO] Model belum ada di {model_path}, skip permutation importance.")
 
