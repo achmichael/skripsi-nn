@@ -13,8 +13,8 @@ from src.models.pascabayar import PascabayarModel
 from src.models.prabayar import PrabayarModel
 
 MODEL_PATHS = {
-    "prabayar": os.path.join(BASE_DIR, "results", "prabayar", "models", "model_prabayar.json"),
-    "pascabayar": os.path.join(BASE_DIR, "results", "pascabayar", "models", "model_pascabayar.json"),
+    "prabayar": os.path.join(BASE_DIR, "../results", "prabayar", "models", "model_prabayar.json"),
+    "pascabayar": os.path.join(BASE_DIR, "../results", "pascabayar", "models", "model_pascabayar.json"),
 }
 
 models = {}
