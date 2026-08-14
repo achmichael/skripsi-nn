@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import numpy as np
 import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from src.pipeline.preprocessing import transform_standard_scaler, inverse_transform_target
 from src.models.pascabayar import PascabayarModel

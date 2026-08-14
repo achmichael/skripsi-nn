@@ -6,7 +6,7 @@ fuser -k 5173/tcp 2>/dev/null || true
 
 echo "Memulai Backend API..."
 source venv/bin/activate
-uvicorn api:app --host 0.0.0.0 --port 8000 --reload &
+uvicorn api.index:app --host 0.0.0.0 --port 8000 --reload &
 BACKEND_PID=$!
 
 echo "Memulai Frontend React..."
