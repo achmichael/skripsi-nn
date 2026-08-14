@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/**/*.py": {
-      "includeFiles": "results/**"
+      "includeFiles": ["results/**/*.json"]
     }
   }
 }
