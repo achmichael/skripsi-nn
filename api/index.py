@@ -23,6 +23,8 @@ MODEL_PATHS = {
 models = {}
 metadatas = {}
 
+load_errors = {}
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load models on startup
@@ -30,18 +32,21 @@ async def lifespan(app: FastAPI):
         models["prabayar"], metadatas["prabayar"] = PrabayarModel.load(MODEL_PATHS["prabayar"])
         print("Model Prabayar loaded successfully")
     except Exception as e:
+        load_errors["prabayar"] = str(e)
         print(f"Failed to load Prabayar model: {e}")
         
     try:
         models["pascabayar"], metadatas["pascabayar"] = PascabayarModel.load(MODEL_PATHS["pascabayar"])
         print("Model Pascabayar loaded successfully")
     except Exception as e:
+        load_errors["pascabayar"] = str(e)
         print(f"Failed to load Pascabayar model: {e}")
         
     yield
     # Cleanup on shutdown
     models.clear()
     metadatas.clear()
+    load_errors.clear()
 
 app = FastAPI(title="Prediksi Listrik API", lifespan=lifespan)
 
@@ -110,7 +115,8 @@ def process_inference_data(data: Dict[str, Any], model_type: str):
 @app.post("/predict/prepaid")
 async def predict_prepaid(data: Dict[str, Any]):
     if "prabayar" not in models:
-        raise HTTPException(status_code=500, detail="Model prabayar not loaded")
+        error_msg = load_errors.get("prabayar", "Unknown error loading model")
+        raise HTTPException(status_code=500, detail=f"Model prabayar not loaded. Error: {error_msg}")
         
     model = models["prabayar"]
     metadata = metadatas["prabayar"]
@@ -146,7 +152,8 @@ async def predict_prepaid(data: Dict[str, Any]):
 @app.post("/predict/postpaid")
 async def predict_postpaid(data: Dict[str, Any]):
     if "pascabayar" not in models:
-        raise HTTPException(status_code=500, detail="Model pascabayar not loaded")
+        error_msg = load_errors.get("pascabayar", "Unknown error loading model")
+        raise HTTPException(status_code=500, detail=f"Model pascabayar not loaded. Error: {error_msg}")
         
     model = models["pascabayar"]
     metadata = metadatas["pascabayar"]
