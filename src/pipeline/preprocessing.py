@@ -381,10 +381,13 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # STEP 7: Numeric Feature Scaling
     # =================================================================
     from src.config.config import config
-    numeric_cols_to_scale = config.get("numeric_cols", []) + [
-        "Estimasi_Fisika_Tagihan_Rp", "Tarif_PLN_Eksak_Rp", "Daya_x_TotalEnergi",
-        "Estimasi_kWh_Didapat", "Estimasi_Fisika_Durasi_Hari"
-    ]
+    numeric_cols_to_scale = list(dict.fromkeys(
+        config.get("numeric_cols", []) + [
+            "Estimasi_Fisika_Tagihan_Rp", "Tarif_PLN_Eksak_Rp", "Daya_x_TotalEnergi",
+            "Estimasi_kWh_Didapat", "Estimasi_Fisika_Durasi_Hari",
+            "Total_Energi_Alat_Lain_kWhPerHari",
+        ]
+    ))
     
     out_scaler_params = {} if scaler_params is None else scaler_params.copy()
     
@@ -409,10 +412,13 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
 # LOAD CSV + PREPROCESS (pengganti load_csv lama)
 # =====================================================================
 
-def load_and_preprocess(path: str) -> pd.DataFrame:
+def load_and_preprocess(path: str) -> tuple[pd.DataFrame, dict]:
     """
     Baca CSV, lalu jalankan full preprocessing pipeline.
     Menangani juga kolom numerik khusus (Daya_Listrik_Rumah_VA).
+
+    Returns:
+        (df_preprocessed, minmax_scaler_params)
     """
     df = pd.read_csv(path, encoding="utf-8-sig")
 
@@ -440,10 +446,9 @@ def load_and_preprocess(path: str) -> pd.DataFrame:
             "Ya": 1,
         }).astype(float)
 
-    # Run main preprocessing
-    df, _ = preprocess(df)
+    df, minmax_scaler_params = preprocess(df)
 
-    return df
+    return df, minmax_scaler_params
 
 
 # =====================================================================

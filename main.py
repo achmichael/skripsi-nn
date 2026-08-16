@@ -368,8 +368,7 @@ def run_training(model_type: str):
     print(f"=== Training model {model_type.upper()} ===\n")
     print(f"[INFO] Log transform: {cfg.get('use_log_transform', False)}")
 
-    # Load & encode
-    rows = load_and_preprocess(cfg["dataset_path"])
+    rows, minmax_scaler_params = load_and_preprocess(cfg["dataset_path"])
     print(f"Total data: {len(rows)} baris")
 
     # Extract features & target
@@ -564,6 +563,7 @@ def run_training(model_type: str):
         "target_column": target_column,
         "x_scaler": x_scaler,
         "y_scaler": y_scaler,
+        "minmax_scaler_params": minmax_scaler_params,
         "layer_sizes": layer_sizes,
     }
 

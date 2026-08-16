@@ -18,7 +18,7 @@ def benchmark_model(model_type):
     
     # 1. Load dan Preprocess Data
     print("Memuat dataset dan melakukan preprocessing...")
-    df = load_and_preprocess(cfg["dataset_path"])
+    df, _ = load_and_preprocess(cfg["dataset_path"])
     
     # 2. Ekstrak Fitur dan Target
     x_data, y_data, feature_cols, target_col = extract_features_and_target(df, model_type)

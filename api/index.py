@@ -65,11 +65,9 @@ def root():
         "status": "success"
     }
 
-def process_inference_data(data: Dict[str, Any], model_type: str):
-    # 1. Konversi input tunggal ke DataFrame 1 baris
+def process_inference_data(data: Dict[str, Any], model_type: str, minmax_scaler_params: dict):
     df_raw = pd.DataFrame([data])
     
-    # 2. Penyesuaian khusus pra-processing (seperti di load_and_preprocess)
     if "Daya_Listrik_Rumah_VA" in df_raw.columns:
         df_raw["Daya_Listrik_Rumah_VA"] = df_raw["Daya_Listrik_Rumah_VA"].replace({
             "Tidak tahu": 900,
@@ -77,7 +75,7 @@ def process_inference_data(data: Dict[str, Any], model_type: str):
         })
         df_raw["Daya_Listrik_Rumah_VA"] = pd.to_numeric(
             df_raw["Daya_Listrik_Rumah_VA"], errors="coerce"
-        ).fillna(900) # Fallback
+        ).fillna(900)
 
     if "Status_Subsidi_Listrik" in df_raw.columns:
         df_raw["Status_Subsidi_Listrik"] = df_raw["Status_Subsidi_Listrik"].map({
@@ -91,14 +89,8 @@ def process_inference_data(data: Dict[str, Any], model_type: str):
             "Ya": 1,
         }).fillna(0).astype(float)
 
-    # 3. Jalankan preprocessing (Step 1-6)
-    # Gunakan scaler manual (MinMax) jika diperlukan, tapi karena output inference hanya 1 baris, 
-    # MinMax scaling default untuk baris tunggal mungkin 0. 
-    # Untuk aman, fitur yang di-MinMax di pipeline sebenarnya tidak masalah diabaikan 
-    # karena StandardScaler di-apply di akhir dengan parameter dari training.
-    df_processed, _ = preprocess(df_raw, scaler_params=None)
+    df_processed, _ = preprocess(df_raw, scaler_params=minmax_scaler_params)
 
-    # 4. Ambil features sesuai config model_type
     feature_columns = config["features"][model_type]
     
     input_values = []
@@ -122,9 +114,10 @@ async def predict_prepaid(data: Dict[str, Any]):
     metadata = metadatas["prabayar"]
     x_scaler = metadata["x_scaler"]
     y_scaler = metadata["y_scaler"]
+    minmax_scaler_params = metadata.get("minmax_scaler_params", {})
     
     # Preprocess
-    input_values = process_inference_data(data, "prabayar")
+    input_values = process_inference_data(data, "prabayar", minmax_scaler_params)
         
     # Scale
     x_scaled = transform_standard_scaler([input_values], x_scaler)
@@ -159,9 +152,10 @@ async def predict_postpaid(data: Dict[str, Any]):
     metadata = metadatas["pascabayar"]
     x_scaler = metadata["x_scaler"]
     y_scaler = metadata["y_scaler"]
+    minmax_scaler_params = metadata.get("minmax_scaler_params", {})
     
     # Preprocess
-    input_values = process_inference_data(data, "pascabayar")
+    input_values = process_inference_data(data, "pascabayar", minmax_scaler_params)
         
     # Scale
     x_scaled = transform_standard_scaler([input_values], x_scaler)

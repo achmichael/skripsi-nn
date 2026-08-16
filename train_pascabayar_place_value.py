@@ -297,7 +297,7 @@ def run_training():
     print(f"=== Training PASCABAYAR PLACE VALUE MODEL ===\n")
 
     # Load & encode
-    rows = load_and_preprocess(cfg["dataset_path"])
+    rows, minmax_scaler_params = load_and_preprocess(cfg["dataset_path"])
     print(f"Total data: {len(rows)} baris")
 
     # Extract features & target
@@ -445,6 +445,7 @@ def run_training():
         "feature_columns": feature_columns,
         "target_column": target_column,
         "x_scaler": x_scaler,
+        "minmax_scaler_params": minmax_scaler_params,
     }
 
     model.save(model_path, metadata=metadata)

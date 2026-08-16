@@ -105,7 +105,7 @@ def load_data(model_type: str):
     cfg = config[model_type]
     
     # 1. Load dan preprocess CSV
-    df = load_and_preprocess(cfg["dataset_path"])
+    df, _ = load_and_preprocess(cfg["dataset_path"])
     
     # 2. Ekstrak target dan fitur (sesuai spesifikasi config)
     x_data, y_data, feat_cols, target_col = extract_features_and_target(df, model_type)
