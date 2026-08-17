@@ -17,114 +17,17 @@ import random
 import numpy as np
 import pandas as pd
 
+from src.config.config import config
+
 
 # =====================================================================
 # MAPPING DICTIONARIES
 # =====================================================================
 
-# --- Kolom yang "Tidak tahu" → NaN lalu imputasi modus ---
-TIDAK_TAHU_COLS = [
-    "Kulkas_Kategori",
-    "AC_PK_Kategori",
-    "Bulan_Tagihan",
-    "Tagihan_Relatif_Stabil",
-]
-
-# --- Kolom yang "Tidak diisi" → NaN lalu imputasi modus ---
-TIDAK_DIISI_COLS = [
-    "Alat_Lain_1_Kategori",
-    "Alat_Lain_2_Kategori",
-    "Alat_Lain_3_Kategori",
-]
-
-# --- Step 2: Bulan_Tagihan label → angka (sebelum sin/cos) ---
-BULAN_TO_NUM = {
-    "Januari": 1,  "Februari": 2,  "Maret": 3,
-    "April": 4,     "Mei": 5,       "Juni": 6,
-    "Juli": 7,      "Agustus": 8,   "September": 9,
-    "Oktober": 10,  "November": 11, "Desember": 12,
-}
-
-# --- Step 3: One-Hot Encoding (nominal, tanpa urutan) ---
-ONE_HOT_COLS = [
-    "Sumber_Angka_Tagihan",
-    "Tagihan_Relatif_Stabil",
-]
-
-# --- Step 4: Ordinal encoding rapat (0-based, consecutive) ---
-# "Tidak tahu" dan "Tidak diisi" sudah di-imputasi, jadi tidak masuk mapping.
-ORDINAL_MAPS = {
-    "Kulkas_Kategori": {
-        "Tidak ada": 0,
-        "Kecil / 1 pintu": 1,
-        "Sedang / 2 pintu": 2,
-        "Besar / side by side": 3,
-    },
-    "TV_Kategori": {
-        "Tidak ada / tidak digunakan": 0,
-        "Jarang, kurang dari 2 jam per hari": 1,
-        "Sedang, sekitar 2-5 jam per hari": 2,
-        "Sering, sekitar 6-10 jam per hari": 3,
-        "Sangat sering, lebih dari 10 jam per hari": 4,
-    },
-    "AC_Kategori": {
-        "Tidak ada / tidak digunakan": 0,
-        "Jarang, kurang dari 2 jam per hari": 1,
-        "Sedang, sekitar 2-5 jam per hari": 2,
-        "Sering, sekitar 6-10 jam per hari": 3,
-        "Sangat sering, lebih dari 10 jam per hari": 4,
-    },
-    "Kipas_Kategori": {
-        "Tidak ada / tidak digunakan": 0,
-        "Jarang, kurang dari 2 jam per hari": 1,
-        "Sedang, sekitar 2-5 jam per hari": 2,
-        "Sering, sekitar 6-10 jam per hari": 3,
-        "Sangat sering, lebih dari 10 jam per hari": 4,
-    },
-    "RiceCooker_Kategori": {
-        "Tidak ada / tidak digunakan": 0,
-        "Jarang, kurang dari 2 jam per hari": 1,
-        "Sedang, sekitar 2-5 jam per hari": 2,
-        "Sering, sekitar 6-10 jam per hari": 3,
-        "Sangat sering, lebih dari 10 jam per hari": 4,
-    },
-    "MesinCuci_Kategori": {
-        "Tidak ada / tidak digunakan": 0,
-        "Jarang, 1-2 kali per minggu": 1,
-        "Sedang, 3-4 kali per minggu": 2,
-        "Sering, 5-6 kali per minggu": 3,
-        "Sangat sering, hampir setiap hari": 4,
-    },
-    "AC_PK_Kategori": {
-        "Tidak ada AC": 0,
-        "1/2 PK": 1,
-        "3/4 PK": 2,
-        "1 PK": 3,
-        "1.5 PK": 4,
-        "2 PK atau lebih": 5,
-    },
-    "Alat_Lain_1_Kategori": {
-        "Jarang, 1-2 kali per minggu": 0,
-        "Sedang, 3-4 kali per minggu": 1,
-        "Sering, hampir setiap hari": 2,
-        "Sangat sering, setiap hari dan cukup lama": 3,
-    },
-    "Alat_Lain_2_Kategori": {
-        "Jarang, 1-2 kali per minggu": 0,
-        "Sedang, 3-4 kali per minggu": 1,
-        "Sering, hampir setiap hari": 2,
-        "Sangat sering, setiap hari dan cukup lama": 3,
-    },
-    "Alat_Lain_3_Kategori": {
-        "Jarang, 1-2 kali per minggu": 0,
-        "Sedang, 3-4 kali per minggu": 1,
-        "Sering, hampir setiap hari": 2,
-        "Sangat sering, setiap hari dan cukup lama": 3,
-    },
-}
+# Mappings are now loaded from src/config/config.py
 
 # Kolom ordinal yang akan di-MinMax scale (Step 5)
-ORDINAL_COLS_TO_SCALE = list(ORDINAL_MAPS.keys())
+ORDINAL_COLS_TO_SCALE = list(config["ordinal_maps"].keys())
 
 
 # =====================================================================
@@ -176,20 +79,6 @@ def manual_minmax(series: pd.Series) -> pd.Series:
 # MAIN PREPROCESSING
 # =====================================================================
 
-OHE_FIXED_CATEGORIES = {
-    "Sumber_Angka_Tagihan": [
-        "Melihat bukti pembayaran / struk",
-        "Melihat rekening listrik / PLN Mobile",
-        "Mengingat dari pembayaran terakhir",
-        "Perkiraan kasar",
-    ],
-    "Tagihan_Relatif_Stabil": [
-        "Tidak tahu",
-        "Tidak, sering berubah",
-        "Ya, relatif stabil",
-    ]
-}
-
 def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.DataFrame, dict]:
     """
     Full preprocessing pipeline. Menerima DataFrame mentah dari CSV,
@@ -218,17 +107,17 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
 
     # 1a. "Tidak tahu" → NaN
-    for col in TIDAK_TAHU_COLS:
+    for col in config["tidak_tahu_cols"]:
         if col in df.columns:
             df[col] = df[col].replace("Tidak tahu", np.nan)
 
     # 1b. "Tidak diisi" → NaN
-    for col in TIDAK_DIISI_COLS:
+    for col in config["tidak_diisi_cols"]:
         if col in df.columns:
             df[col] = df[col].replace("Tidak diisi", np.nan)
 
     # 1c. Imputasi NaN dengan modus manual
-    all_impute_cols = TIDAK_TAHU_COLS + TIDAK_DIISI_COLS
+    all_impute_cols = config["tidak_tahu_cols"] + config["tidak_diisi_cols"]
     for col in all_impute_cols:
         if col in df.columns and df[col].isna().any():
             mode_val = manual_mode(df[col])
@@ -239,7 +128,7 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
     if "Bulan_Tagihan" in df.columns:
         # Map nama bulan → angka 1-12
-        bulan_num = df["Bulan_Tagihan"].map(BULAN_TO_NUM)
+        bulan_num = df["Bulan_Tagihan"].map(config["bulan_to_num"])
 
         # Cyclical transform: sin & cos dengan periode 12
         df["Bulan_Tagihan_sin"] = np.sin(2 * np.pi * bulan_num / 12)
@@ -251,12 +140,12 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
     # STEP 3: Manual One-Hot Encoding (Nominal)
     # =================================================================
-    for col in ONE_HOT_COLS:
+    for col in config["one_hot_cols"]:
         if col not in df.columns:
             continue
 
         # BUG 1 Fix: Use hardcoded deterministic categories
-        categories = OHE_FIXED_CATEGORIES.get(col, sorted(df[col].dropna().unique()))
+        categories = config["ohe_fixed_categories"].get(col, sorted(df[col].dropna().unique()))
 
         # Buat binary columns manual
         for cat in categories:
@@ -269,7 +158,7 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
     # STEP 4: Ordinal Encoding Rapat (0-based, consecutive)
     # =================================================================
-    for col, mapping in ORDINAL_MAPS.items():
+    for col, mapping in config["ordinal_maps"].items():
         if col in df.columns:
             df[col] = df[col].map(mapping)
 
@@ -380,7 +269,6 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
     # STEP 7: Numeric Feature Scaling
     # =================================================================
-    from src.config.config import config
     numeric_cols_to_scale = list(dict.fromkeys(
         config.get("numeric_cols", []) + [
             "Estimasi_Fisika_Tagihan_Rp", "Tarif_PLN_Eksak_Rp", "Daya_x_TotalEnergi",

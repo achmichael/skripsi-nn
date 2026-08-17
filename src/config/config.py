@@ -427,4 +427,107 @@ config = {
             "Lainnya",
         ],
     },
+    "tidak_tahu_cols": [
+        "Kulkas_Kategori",
+        "AC_PK_Kategori",
+        "Bulan_Tagihan",
+        "Tagihan_Relatif_Stabil",
+    ],
+    "tidak_diisi_cols": [
+        "Alat_Lain_1_Kategori",
+        "Alat_Lain_2_Kategori",
+        "Alat_Lain_3_Kategori",
+    ],
+    "bulan_to_num": {
+        "Januari": 1,  "Februari": 2,  "Maret": 3,
+        "April": 4,     "Mei": 5,       "Juni": 6,
+        "Juli": 7,      "Agustus": 8,   "September": 9,
+        "Oktober": 10,  "November": 11, "Desember": 12,
+    },
+    "one_hot_cols": [
+        "Sumber_Angka_Tagihan",
+        "Tagihan_Relatif_Stabil",
+    ],
+    "ohe_fixed_categories": {
+        "Sumber_Angka_Tagihan": [
+            "Melihat bukti pembayaran / struk",
+            "Melihat rekening listrik / PLN Mobile",
+            "Mengingat dari pembayaran terakhir",
+            "Perkiraan kasar",
+        ],
+        "Tagihan_Relatif_Stabil": [
+            "Tidak tahu",
+            "Tidak, sering berubah",
+            "Ya, relatif stabil",
+        ]
+    },
+    "ordinal_maps": {
+        "Kulkas_Kategori": {
+            "Tidak ada": 0,
+            "Kecil / 1 pintu": 1,
+            "Sedang / 2 pintu": 2,
+            "Besar / side by side": 3,
+        },
+        "TV_Kategori": {
+            "Tidak ada / tidak digunakan": 0,
+            "Jarang, kurang dari 2 jam per hari": 1,
+            "Sedang, sekitar 2-5 jam per hari": 2,
+            "Sering, sekitar 6-10 jam per hari": 3,
+            "Sangat sering, lebih dari 10 jam per hari": 4,
+        },
+        "AC_Kategori": {
+            "Tidak ada / tidak digunakan": 0,
+            "Jarang, kurang dari 2 jam per hari": 1,
+            "Sedang, sekitar 2-5 jam per hari": 2,
+            "Sering, sekitar 6-10 jam per hari": 3,
+            "Sangat sering, lebih dari 10 jam per hari": 4,
+        },
+        "Kipas_Kategori": {
+            "Tidak ada / tidak digunakan": 0,
+            "Jarang, kurang dari 2 jam per hari": 1,
+            "Sedang, sekitar 2-5 jam per hari": 2,
+            "Sering, sekitar 6-10 jam per hari": 3,
+            "Sangat sering, lebih dari 10 jam per hari": 4,
+        },
+        "RiceCooker_Kategori": {
+            "Tidak ada / tidak digunakan": 0,
+            "Jarang, kurang dari 2 jam per hari": 1,
+            "Sedang, sekitar 2-5 jam per hari": 2,
+            "Sering, sekitar 6-10 jam per hari": 3,
+            "Sangat sering, lebih dari 10 jam per hari": 4,
+        },
+        "MesinCuci_Kategori": {
+            "Tidak ada / tidak digunakan": 0,
+            "Jarang, 1-2 kali per minggu": 1,
+            "Sedang, 3-4 kali per minggu": 2,
+            "Sering, 5-6 kali per minggu": 3,
+            "Sangat sering, hampir setiap hari": 4,
+        },
+        "AC_PK_Kategori": {
+            "Tidak ada AC": 0,
+            "1/2 PK": 1,
+            "3/4 PK": 2,
+            "1 PK": 3,
+            "1.5 PK": 4,
+            "2 PK atau lebih": 5,
+        },
+        "Alat_Lain_1_Kategori": {
+            "Jarang, 1-2 kali per minggu": 0,
+            "Sedang, 3-4 kali per minggu": 1,
+            "Sering, hampir setiap hari": 2,
+            "Sangat sering, setiap hari dan cukup lama": 3,
+        },
+        "Alat_Lain_2_Kategori": {
+            "Jarang, 1-2 kali per minggu": 0,
+            "Sedang, 3-4 kali per minggu": 1,
+            "Sering, hampir setiap hari": 2,
+            "Sangat sering, setiap hari dan cukup lama": 3,
+        },
+        "Alat_Lain_3_Kategori": {
+            "Jarang, 1-2 kali per minggu": 0,
+            "Sedang, 3-4 kali per minggu": 1,
+            "Sering, hampir setiap hari": 2,
+            "Sangat sering, setiap hari dan cukup lama": 3,
+        },
+    },
 }
