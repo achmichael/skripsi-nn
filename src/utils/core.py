@@ -51,7 +51,7 @@ def train_model(
     """
     use_log           : must match use_log_transform config value, passed through to inverse_transform_target
     """
-    
+
     # Convert lists to NumPy arrays for fast vectorized operations
     X_train_np = np.array(x_train, dtype=np.float32)
     y_train_np = np.array(y_train, dtype=np.float32).reshape(-1, 1)
@@ -83,7 +83,13 @@ def train_model(
         X_shuffled = X_train_np[indices]
         y_shuffled = y_train_np[indices]
 
+        # rumus decay
         current_lr = learning_rate / (1.0 + lr_decay * epoch)
+
+        # print('learning_rate', learning_rate)
+        # print('lr decay', lr_decay)
+        # print('epoch', epoch)
+        # print('current lr', current_lr)
 
         total_train_loss = 0.0
         n_batches = 0
@@ -94,7 +100,7 @@ def train_model(
             y_batch = y_shuffled[start:end]
 
             batch_loss = model.train_batch(x_batch, y_batch, current_lr)
-            
+
             total_train_loss += batch_loss
             n_batches += 1
 
@@ -147,11 +153,11 @@ def evaluate_model(
     y_test: list[float],
 ) -> dict:
     predictions = []
-    
+
     # Can process all at once for speed
     X_test_np = np.array(x_test, dtype=np.float32)
     preds_np = model.predict(X_test_np)
-    
+
     predictions = preds_np.flatten().tolist()
 
     mse = mean_squared_error(predictions, y_test)

@@ -93,7 +93,7 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
     plt.close()
 
     print(f"Loss curve disimpan ke: {save_path} (epoch aktual: {trained_epochs})")
-    
+
 def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: str, label: str):
     """Plot scatter prediksi vs aktual dengan satuan ribu Rp, zona toleransi, dan statistik."""
     # Konversi ke ribu Rp agar label sumbu terbaca jelas
@@ -189,7 +189,7 @@ def plot_error_distribution(
     show: bool = True,
 ) -> None:
     """
-    Membuat visualisasi distribusi error prediksi Neural Network dan 
+    Membuat visualisasi distribusi error prediksi Neural Network dan
     breakdown Mean Absolute Error (MAE) berdasarkan bucket tagihan aktual.
 
     Args:
@@ -221,7 +221,7 @@ def plot_error_distribution(
 
     errors_scaled = errors / unit_divider
     mae_scaled = mae_rupiah / unit_divider
-    
+
     mean_e = np.mean(errors_scaled)
     median_e = np.median(errors_scaled)
     std_e = np.std(errors_scaled)
@@ -234,15 +234,15 @@ def plot_error_distribution(
     # =========================================================================
     # REQUIREMENT 2: Error Distribution Plot (Subplot 1)
     # =========================================================================
-    
+
     # 2a: Fixed 30 bins
     ax1.hist(errors_scaled, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
-    
+
     # 2b & 2c: 10 evenly spaced ticks formatted to 1 decimal with + sign
     ticks = np.linspace(min_e, max_e, 10)
     ax1.set_xticks(ticks)
     ax1.set_xticklabels([f"{v:+.1f}" for v in ticks])
-    
+
     ax1.set_xlabel(f"Error ({unit_name}) [Prediksi - Aktual]", fontsize=12)
     ax1.set_ylabel("Frekuensi", fontsize=12)
     ax1.set_title("Distribusi Error Prediksi", fontsize=14, fontweight='bold')
@@ -254,17 +254,17 @@ def plot_error_distribution(
     offset = max(range_e * 0.005, 1e-5)
     mean_offset = 0.0
     median_offset = 0.0
-    
+
     if abs(mean_e - 0.0) <= offset * 2:
         mean_offset = offset
-    
+
     if abs(median_e - 0.0) <= offset * 2 or abs(median_e - mean_e) <= offset * 2:
         median_offset = -offset
 
     ax1.axvline(0, color='black', linestyle='-', linewidth=2, label='Zero Error')
     ax1.axvline(mean_e + mean_offset, color='orange', linestyle='--', linewidth=2, label='Mean')
     ax1.axvline(median_e + median_offset, color='yellow', linestyle=':', linewidth=2, label='Median')
-    
+
     ax1.legend(loc='upper left', fontsize=10)
 
     # 2d: Annotation box
@@ -282,7 +282,7 @@ def plot_error_distribution(
     # =========================================================================
     # REQUIREMENT 3: Per-Bucket Error Breakdown (Subplot 2)
     # =========================================================================
-    
+
     buckets = [
         (0, 150_000, "0–150rb"),
         (150_000, 300_000, "150–300rb"),
@@ -290,26 +290,26 @@ def plot_error_distribution(
         (500_000, 750_000, "500–750rb"),
         (750_000, float('inf'), "750rb+")
     ]
-    
+
     bucket_labels = []
     bucket_maes = []
     bucket_counts = []
     bucket_colors = []
-    
+
     for low, high, label in buckets:
         mask = (y_t >= low) & (y_t < high)
         count = np.sum(mask)
-        
+
         bucket_labels.append(label)
         bucket_counts.append(count)
-        
+
         if count > 0:
             bucket_errs = errors[mask]
             b_mae_raw = np.mean(np.abs(bucket_errs))
             b_mae_ribu = b_mae_raw / 1000.0
-            
+
             bucket_maes.append(b_mae_ribu)
-            
+
             if b_mae_raw < 100_000:
                 bucket_colors.append('green')
             elif b_mae_raw < 200_000:
@@ -319,16 +319,16 @@ def plot_error_distribution(
         else:
             bucket_maes.append(0.0)
             bucket_colors.append('gray')
-            
+
     x_pos = np.arange(len(buckets))
     bars = ax2.bar(x_pos, bucket_maes, color=bucket_colors, edgecolor='black', alpha=0.7)
-    
+
     ax2.set_xticks(x_pos)
     ax2.set_xticklabels(bucket_labels, fontsize=10)
     ax2.set_xlabel("Tagihan Aktual", fontsize=12)
     ax2.set_ylabel("MAE (ribu Rp)", fontsize=12)
     ax2.set_title("Mean Absolute Error per Bucket Tagihan Aktual", fontsize=14, fontweight='bold')
-    
+
     # Annotate bars with sample counts
     for bar, count in zip(bars, bucket_counts):
         height = bar.get_height()
@@ -337,11 +337,11 @@ def plot_error_distribution(
                      f"n={count}", ha='center', va='bottom', fontsize=10)
 
     plt.tight_layout()
-    
+
     if save_path:
         plt.savefig(save_path, dpi=150)
         print(f"Error distribution disimpan ke: {save_path}")
-        
+
     if show:
         plt.show()
     else:

@@ -49,7 +49,7 @@ class PascabayarModel(NeuralNetwork):
         self.beta2 = 0.999
         self.epsilon = 1e-8
         self.t = 0
-        
+
         self.m_w = [np.zeros_like(w) for w in self.weights]
         self.v_w = [np.zeros_like(w) for w in self.weights]
         self.m_b = [np.zeros_like(b) for b in self.biases]
@@ -66,15 +66,23 @@ class PascabayarModel(NeuralNetwork):
 
         for l in range(self.num_layers - 1):
             is_output_layer = (l == self.num_layers - 2)
-            
+
             if is_output_layer:
                 z = np.dot(current, self.weights[l].T)
             else:
                 z = np.dot(current, self.weights[l].T) + self.biases[l]
-                
+
             self._pre_activations.append(z)
             
+            # Logging nilai fitur sebelum dan sesudah masuk fungsi aktivasi ReLU
+            if not is_output_layer:
+                print(f"[Pascabayar Forward] Layer {l+1} - Sebelum ReLU:\n{z}")
+
             a = z if is_output_layer else relu(z)
+            
+            if not is_output_layer:
+                print(f"[Pascabayar Forward] Layer {l+1} - Sesudah ReLU:\n{a}")
+                
             self._activations.append(a)
             current = a
 
@@ -103,16 +111,25 @@ class PascabayarModel(NeuralNetwork):
             y_batch = y_batch.reshape(-1, 1)
 
         total_loss = self._mse_loss(prediction, y_batch)
+        # print('total loss', total_loss)
 
-        # δ_out = (1/m)(ŷ − y) — tanpa faktor 2, konsisten dengan L = (1/(2m))Σ(ŷ−y)²
-        output_grad = (prediction - y_batch) / batch_size
+        # output grad menggunakan faktor 2, dikarenakan melihat dari perhitungan loss (MSE) menurunkan (y^−y)2
+        # menghitung delta out dan membagi dengan batch size
+        output_grad = 2 * (prediction - y_batch) / batch_size
 
+        # print('output grad', output_grad)
         deltas = [None] * (self.num_layers - 1)
+        # print('deltas', deltas)
+        # masukkan value output_grad ke elemen terakhir
         deltas[-1] = output_grad
+        # print('deltas after assign value', deltas)
+        # print('num layers', self.num_layers)
 
         # Hidden layer deltas — tanpa clipping pada delta
         for l in range(self.num_layers - 3, -1, -1):
+            # propagasi dari layer setelahnya ke layer saat ini
             grad = np.dot(deltas[l + 1], self.weights[l + 1])
+            # turunan fungsi relu
             grad *= relu_derivative(self._pre_activations[l])
             deltas[l] = grad
 
@@ -121,16 +138,23 @@ class PascabayarModel(NeuralNetwork):
         # Update weight dan bias
         for l in range(self.num_layers - 1):
             inputs_l = self._activations[l]
-            
+            # np.dot mewakili sum antara sampel dalam batch dengan perkalian nilai aktivasi layer sebelumnya
+            # method dot mewakili operasi sigma, karena otomatis akan menjumlahkan seluruh elemen
             grad_w = np.dot(deltas[l].T, inputs_l)
+            # print('gradient bobot layer', l)
+            # print('shape input', inputs_l.shape)
+            # print('shape delta', deltas[l].shape)
+            # print('shape gradient bobot', grad_w.shape)
 
             # L2 regularization: Grad += (λ/m)W — setelah gradien dihitung
             if self.l2_lambda > 0:
                 grad_w += (self.l2_lambda / batch_size) * self.weights[l]
 
+            # print('gradient bobot sebelum clipping', grad_w)
             # Gradient clipping — setelah L2, pada gradien weight
             grad_w = self._clip_gradient(grad_w, self.clip_value)
-                
+            # print('gradient bobot setelah clipping', grad_w)
+
             # Adam update for weights
             self.m_w[l] = self.beta1 * self.m_w[l] + (1 - self.beta1) * grad_w
             self.v_w[l] = self.beta2 * self.v_w[l] + (1 - self.beta2) * (grad_w ** 2)
@@ -138,15 +162,19 @@ class PascabayarModel(NeuralNetwork):
             v_w_hat = self.v_w[l] / (1 - self.beta2 ** self.t)
 
             self.weights[l] -= learning_rate * m_w_hat / (np.sqrt(v_w_hat) + self.epsilon)
+            # self.weights[l] -= learning_rate * grad_w
 
             # Bias update — skip output layer (output layer tidak punya bias)
             if l < self.num_layers - 2:
                 grad_b = np.sum(deltas[l], axis=0)
                 grad_b = self._clip_gradient(grad_b, self.clip_value)
-                
+
                 # Adam update for biases
+                # Momentum bias
                 self.m_b[l] = self.beta1 * self.m_b[l] + (1 - self.beta1) * grad_b
+                # Variansi bias
                 self.v_b[l] = self.beta2 * self.v_b[l] + (1 - self.beta2) * (grad_b ** 2)
+                # Momentum bias yang sudah dikoreksi
                 m_b_hat = self.m_b[l] / (1 - self.beta1 ** self.t)
                 v_b_hat = self.v_b[l] / (1 - self.beta2 ** self.t)
 

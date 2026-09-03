@@ -83,7 +83,15 @@ class PrabayarModel(NeuralNetwork):
             
             self._pre_activations.append(z)
             
+            # Logging nilai fitur sebelum dan sesudah masuk fungsi aktivasi ReLU
+            if not is_output_layer:
+                print(f"[Prabayar Forward] Layer {l+1} - Sebelum ReLU:\n{z}")
+            
             a = z if is_output_layer else relu(z)
+            
+            if not is_output_layer:
+                print(f"[Prabayar Forward] Layer {l+1} - Sesudah ReLU:\n{a}")
+
             self._activations.append(a)
             current = a
 

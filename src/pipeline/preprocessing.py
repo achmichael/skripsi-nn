@@ -495,12 +495,16 @@ def transform_target(y_data: list[float], scaler: dict) -> list[float]:
 def inverse_transform_target(value: float, scaler: dict) -> float:
     """Inverse transform: normalized [0,1] → original scale (with optional exp)."""
     raw = value * (scaler["max"] - scaler["min"]) + scaler["min"]
-    # print("value", value)
-    # print("scaler max", scaler["max"])
-    # print("scaler min", scaler["min"])
-    # print("raw", raw)
+    
+    print(f"[Inverse Transform Target] Scaled Value: {value:.6f}")
+    print(f"[Inverse Transform Target] Scaler Min: {scaler['min']:.6f}, Max: {scaler['max']:.6f}")
+    print(f"[Inverse Transform Target] Raw Pre-Log (if any): {raw:.6f}")
+
     if scaler.get("use_log", False):
         raw = min(raw, 709.0)
-        return float(np.expm1(raw))
+        final_val = float(np.expm1(raw))
+        print(f"[Inverse Transform Target] Applying expm1. Final Value: {final_val:.6f}")
+        return final_val
 
+    print(f"[Inverse Transform Target] Final Value: {raw:.6f}")
     return raw
