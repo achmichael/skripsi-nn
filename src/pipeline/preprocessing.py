@@ -87,7 +87,7 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     Contoh penggunaan:
       # Training:
       df_train, train_scaler = preprocess(df_train, scaler_params=None)
-      
+
       # Inference/Test:
       df_test, _ = preprocess(df_test, scaler_params=train_scaler)
 
@@ -101,7 +101,7 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
       7. Min-Max scaling pada numeric features dengan scaler parameter.
     """
     df = df.copy()
-
+    print('df', df)
     # =================================================================
     # STEP 1: Noise Removal & Manual Mode Imputation
     # =================================================================
@@ -165,21 +165,21 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
     # STEP 5: Manual Min-Max Scaling pada Kolom Ordinal
     # =================================================================
-    for col in ORDINAL_COLS_TO_SCALE:
-        if col in df.columns:
-            df[col] = manual_minmax(df[col].astype(float))
+    # for col in ORDINAL_COLS_TO_SCALE:
+    #     if col in df.columns:
+    #         df[col] = manual_minmax(df[col].astype(float))
 
     # =================================================================
     # STEP 6: Feature Engineering — Physical Approximations & Interactions
     # =================================================================
-    
+
     # Fungsi pembantu untuk menghitung tarif eksak PLN
     def hitung_tarif(row):
         daya = row.get("Daya_Listrik_Rumah_VA", 900)
         # BUG 3 Fix: Compare raw string instead of float mapping
         raw_subsidi = row.get("Status_Subsidi_Listrik", "")
         is_subsidi = str(raw_subsidi).strip().lower() == "subsidi"
-        
+
         if daya <= 450: return 415.0
         if daya == 900: return 605.0 if is_subsidi else 1352.0
         if daya in [1300, 2200]: return 1444.70
@@ -209,7 +209,7 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
 
     # Nominal token Rp → kWh → days at current consumption rate
     # Using survey-based tariff estimate (may differ from physics tariff)
-    if ("Nominal_Token_Terakhir_Rp" in df.columns and 
+    if ("Nominal_Token_Terakhir_Rp" in df.columns and
         "Estimasi_Tarif_Per_kWh_Rp" in df.columns and
         "Total_Energi_Semua_kWhPerHari" in df.columns):
         kwh_beli = df["Nominal_Token_Terakhir_Rp"] / (
@@ -230,14 +230,14 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
             kategorikan_nominal
         )
 
-    if ("Total_Energi_Semua_kWhPerHari" in df.columns and 
+    if ("Total_Energi_Semua_kWhPerHari" in df.columns and
         "Nominal_Token_Terakhir_Rp" in df.columns):
         df["Energi_Per_Nominal"] = (
             df["Total_Energi_Semua_kWhPerHari"] /
             (df["Nominal_Token_Terakhir_Rp"] / 1000.0 + 0.01)
         )
 
-    if ("Estimasi_Fisika_Durasi_Hari" in df.columns and 
+    if ("Estimasi_Fisika_Durasi_Hari" in df.columns and
         "Durasi_Dari_Frekuensi" in df.columns):
         df["Fisika_vs_Frekuensi_Gap"] = (
             df["Estimasi_Fisika_Durasi_Hari"] - df["Durasi_Dari_Frekuensi"]
@@ -269,30 +269,31 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     # =================================================================
     # STEP 7: Numeric Feature Scaling
     # =================================================================
-    numeric_cols_to_scale = list(dict.fromkeys(
-        config.get("numeric_cols", []) + [
-            "Estimasi_Fisika_Tagihan_Rp", "Tarif_PLN_Eksak_Rp", "Daya_x_TotalEnergi",
-            "Estimasi_kWh_Didapat", "Estimasi_Fisika_Durasi_Hari",
-            "Total_Energi_Alat_Lain_kWhPerHari",
-        ]
-    ))
-    
-    out_scaler_params = {} if scaler_params is None else scaler_params.copy()
-    
-    for col in numeric_cols_to_scale:
-        if col in df.columns:
-            if scaler_params is None:
-                min_val, max_val = fit_minmax(df[col].astype(float))
-                out_scaler_params[col] = {"min": min_val, "max": max_val}
-            else:
-                if col in scaler_params:
-                    min_val = scaler_params[col]["min"]
-                    max_val = scaler_params[col]["max"]
-                else:
-                    min_val, max_val = 0.0, 1.0
-                    
-            df[col] = apply_minmax(df[col].astype(float), min_val, max_val)
+    # numeric_cols_to_scale = list(dict.fromkeys(
+    #     config.get("numeric_cols", []) + [
+    #         "Estimasi_Fisika_Tagihan_Rp", "Tarif_PLN_Eksak_Rp", "Daya_x_TotalEnergi",
+    #         "Estimasi_kWh_Didapat", "Estimasi_Fisika_Durasi_Hari",
+    #         "Total_Energi_Alat_Lain_kWhPerHari",
+    #     ]
+    # ))
 
+    out_scaler_params = {} if scaler_params is None else scaler_params.copy()
+
+    # for col in numeric_cols_to_scale:
+    #     if col in df.columns:
+    #         if scaler_params is None:
+    #             min_val, max_val = fit_minmax(df[col].astype(float))
+    #             out_scaler_params[col] = {"min": min_val, "max": max_val}
+    #         else:
+    #             if col in scaler_params:
+    #                 min_val = scaler_params[col]["min"]
+    #                 max_val = scaler_params[col]["max"]
+    #             else:
+    #                 min_val, max_val = 0.0, 1.0
+
+    #         df[col] = apply_minmax(df[col].astype(float), min_val, max_val)
+
+    print('dataframe', df['Estimasi_Tarif_Per_kWh_Rp'])
     return df, out_scaler_params
 
 
@@ -495,16 +496,16 @@ def transform_target(y_data: list[float], scaler: dict) -> list[float]:
 def inverse_transform_target(value: float, scaler: dict) -> float:
     """Inverse transform: normalized [0,1] → original scale (with optional exp)."""
     raw = value * (scaler["max"] - scaler["min"]) + scaler["min"]
-    
-    print(f"[Inverse Transform Target] Scaled Value: {value:.6f}")
-    print(f"[Inverse Transform Target] Scaler Min: {scaler['min']:.6f}, Max: {scaler['max']:.6f}")
-    print(f"[Inverse Transform Target] Raw Pre-Log (if any): {raw:.6f}")
+
+    # print(f"[Inverse Transform Target] Scaled Value: {value:.6f}")
+    # print(f"[Inverse Transform Target] Scaler Min: {scaler['min']:.6f}, Max: {scaler['max']:.6f}")
+    # print(f"[Inverse Transform Target] Raw Pre-Log (if any): {raw:.6f}")
 
     if scaler.get("use_log", False):
         raw = min(raw, 709.0)
         final_val = float(np.expm1(raw))
-        print(f"[Inverse Transform Target] Applying expm1. Final Value: {final_val:.6f}")
+        # print(f"[Inverse Transform Target] Applying expm1. Final Value: {final_val:.6f}")
         return final_val
 
-    print(f"[Inverse Transform Target] Final Value: {raw:.6f}")
+    # print(f"[Inverse Transform Target] Final Value: {raw:.6f}")
     return raw
