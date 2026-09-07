@@ -11,8 +11,6 @@ import matplotlib.ticker as mticker
 from src.pipeline.preprocessing import (
     load_and_preprocess,
     train_test_split,
-    fit_minmax_scaler,
-    transform_minmax,
     fit_standard_scaler,
     transform_standard_scaler,
     fit_target_scaler,
@@ -24,7 +22,6 @@ from src.utils.core import (
     train_model,
     evaluate_model,
 )
-from src.models.pascabayar import PascabayarModel
 from src.models.prabayar import PrabayarModel
 from src.models.neural_network import NeuralNetwork
 from src.config.config import config
@@ -95,26 +92,24 @@ def save_loss_curve(history: dict, save_path: str, model_type: str):
     print(f"Loss curve disimpan ke: {save_path} (epoch aktual: {trained_epochs})")
 
 def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: str, label: str):
-    """Plot scatter prediksi vs aktual dengan satuan ribu Rp, zona toleransi, dan statistik."""
-    # Konversi ke ribu Rp agar label sumbu terbaca jelas
-    scale = 1_000
-    actual_k  = [v / scale for v in y_actual]
-    pred_k    = [v / scale for v in y_predicted]
+    """Plot scatter prediksi vs aktual dengan zona toleransi dan statistik."""
+    actual_vals = list(y_actual)
+    pred_vals   = list(y_predicted)
 
     # Hitung R²
-    mean_actual = sum(actual_k) / len(actual_k)
-    ss_tot = sum((a - mean_actual) ** 2 for a in actual_k)
-    ss_res = sum((a - p) ** 2 for a, p in zip(actual_k, pred_k))
+    mean_actual = sum(actual_vals) / len(actual_vals)
+    ss_tot = sum((a - mean_actual) ** 2 for a in actual_vals)
+    ss_res = sum((a - p) ** 2 for a, p in zip(actual_vals, pred_vals))
     r2 = 1 - ss_res / ss_tot if ss_tot > 0 else 0.0
 
     # Hitung persen prediksi dalam toleransi ±20%
     within_20pct = sum(
-        1 for a, p in zip(actual_k, pred_k)
+        1 for a, p in zip(actual_vals, pred_vals)
         if a != 0 and abs(p - a) / abs(a) <= 0.20
     )
-    pct_within = within_20pct / len(actual_k) * 100
+    pct_within = within_20pct / len(actual_vals) * 100
 
-    all_vals = actual_k + pred_k
+    all_vals = actual_vals + pred_vals
     min_val  = min(all_vals)
     max_val  = max(all_vals)
     margin   = (max_val - min_val) * 0.05
@@ -137,29 +132,21 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
     # Scatter points — warna berdasarkan masuk/keluar toleransi
     colors = [
         "#4CAF50" if abs(a) > 0 and abs(p - a) / abs(a) <= 0.20 else "#F44336"
-        for a, p in zip(actual_k, pred_k)
+        for a, p in zip(actual_vals, pred_vals)
     ]
-    ax.scatter(actual_k, pred_k, c=colors, alpha=0.75, s=35, zorder=3)
+    ax.scatter(actual_vals, pred_vals, c=colors, alpha=0.75, s=35, zorder=3)
 
     # Garis ideal y = x
     ax.plot([lo, hi], [lo, hi], "k--", linewidth=1.5, label="Ideal (y = x)", zorder=4)
 
     # Dummy scatter untuk legend
-    ax.scatter([], [], c="#4CAF50", s=35, label=f"Dalam toleransi ({within_20pct}/{len(actual_k)} titik)")
+    ax.scatter([], [], c="#4CAF50", s=35, label=f"Dalam toleransi ({within_20pct}/{len(actual_vals)} titik)")
     ax.scatter([], [], c="#F44336", s=35, label="Di luar toleransi")
-
-    # Format sumbu dengan satuan ribu Rp — tampilkan angka bulat ribuan
-    def fmt_ribu(x, _):
-        return f"{x:,.0f} rb"
-
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(fmt_ribu))
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_ribu))
-    ax.tick_params(axis='x', rotation=30)
 
     ax.set_xlim(lo, hi)
     ax.set_ylim(lo, hi)
-    ax.set_xlabel(f"Aktual ({label}) — ribu Rp", fontsize=12)
-    ax.set_ylabel(f"Prediksi ({label}) — ribu Rp", fontsize=12)
+    ax.set_xlabel(f"Aktual ({label})", fontsize=12)
+    ax.set_ylabel(f"Prediksi ({label})", fontsize=12)
     ax.set_title(f"Prediksi vs Aktual — {model_type.upper()}", fontsize=14, fontweight="bold")
     ax.legend(fontsize=9, loc="upper left")
     ax.grid(True, alpha=0.3)
@@ -184,20 +171,12 @@ def save_prediction_scatter(y_actual, y_predicted, save_path: str, model_type: s
 def plot_error_distribution(
     y_true: list[float],
     y_pred: list[float],
-    mae_rupiah: float,
+    mae_value: float,
     save_path: str | None = None,
     show: bool = True,
 ) -> None:
     """
-    Membuat visualisasi distribusi error prediksi Neural Network dan
-    breakdown Mean Absolute Error (MAE) berdasarkan bucket tagihan aktual.
-
-    Args:
-        y_true: List nilai aktual (dalam Rupiah).
-        y_pred: List nilai prediksi model (dalam Rupiah).
-        mae_rupiah: Nilai keseluruhan Mean Absolute Error (dalam Rupiah).
-        save_path: Path opsional untuk menyimpan grafik sebagai PNG.
-        show: Apakah akan menampilkan plot secara interaktif.
+    Membuat visualisasi distribusi error prediksi Neural Network.
     """
     import numpy as np
     import matplotlib.pyplot as plt
@@ -210,17 +189,8 @@ def plot_error_distribution(
     if n == 0:
         return
 
-    # REQUIREMENT 1: Auto Unit Scaling
-    max_abs_err = np.max(np.abs(errors))
-    if max_abs_err < 500_000:
-        unit_divider = 1_000.0
-        unit_name = "ribu Rp"
-    else:
-        unit_divider = 1_000_000.0
-        unit_name = "juta Rp"
-
-    errors_scaled = errors / unit_divider
-    mae_scaled = mae_rupiah / unit_divider
+    errors_scaled = errors
+    mae_scaled = mae_value
 
     mean_e = np.mean(errors_scaled)
     median_e = np.median(errors_scaled)
@@ -229,28 +199,20 @@ def plot_error_distribution(
     max_e = np.max(errors_scaled)
     range_e = max_e - min_e
 
-    fig, (ax1, ax2) = plt.subplots(nrows=2, ncols=1, figsize=(12, 10))
+    fig, ax1 = plt.subplots(figsize=(12, 6))
 
-    # =========================================================================
-    # REQUIREMENT 2: Error Distribution Plot (Subplot 1)
-    # =========================================================================
-
-    # 2a: Fixed 30 bins
     ax1.hist(errors_scaled, bins=30, color='skyblue', edgecolor='black', alpha=0.7)
 
-    # 2b & 2c: 10 evenly spaced ticks formatted to 1 decimal with + sign
     ticks = np.linspace(min_e, max_e, 10)
     ax1.set_xticks(ticks)
     ax1.set_xticklabels([f"{v:+.1f}" for v in ticks])
 
-    ax1.set_xlabel(f"Error ({unit_name}) [Prediksi - Aktual]", fontsize=12)
+    ax1.set_xlabel("Error (hari) [Prediksi - Aktual]", fontsize=12)
     ax1.set_ylabel("Frekuensi", fontsize=12)
     ax1.set_title("Distribusi Error Prediksi", fontsize=14, fontweight='bold')
 
-    # 2f: Light green shaded region for ±MAE
     ax1.axvspan(-mae_scaled, mae_scaled, color='lightgreen', alpha=0.3, label='±MAE zone')
 
-    # 2e: Reference lines with dynamic anti-overlap offsets (0.5% of range)
     offset = max(range_e * 0.005, 1e-5)
     mean_offset = 0.0
     median_offset = 0.0
@@ -267,74 +229,16 @@ def plot_error_distribution(
 
     ax1.legend(loc='upper left', fontsize=10)
 
-    # 2d: Annotation box
     stats_text = (
         f"n = {n} data\n"
-        f"Mean = {mean_e:+.1f} {unit_name}\n"
-        f"Median = {median_e:+.1f} {unit_name}\n"
-        f"Std Dev = {std_e:.1f} {unit_name}\n"
-        f"Range: [{min_e:+.1f}, {max_e:+.1f}] {unit_name}"
+        f"Mean = {mean_e:+.1f} hari\n"
+        f"Median = {median_e:+.1f} hari\n"
+        f"Std Dev = {std_e:.1f} hari\n"
+        f"Range: [{min_e:+.1f}, {max_e:+.1f}] hari"
     )
     props = dict(boxstyle='round,pad=0.5', facecolor='white', alpha=0.8, edgecolor='gray')
     ax1.text(0.95, 0.95, stats_text, transform=ax1.transAxes, fontsize=10,
              verticalalignment='top', horizontalalignment='right', bbox=props)
-
-    # =========================================================================
-    # REQUIREMENT 3: Per-Bucket Error Breakdown (Subplot 2)
-    # =========================================================================
-
-    buckets = [
-        (0, 150_000, "0–150rb"),
-        (150_000, 300_000, "150–300rb"),
-        (300_000, 500_000, "300–500rb"),
-        (500_000, 750_000, "500–750rb"),
-        (750_000, float('inf'), "750rb+")
-    ]
-
-    bucket_labels = []
-    bucket_maes = []
-    bucket_counts = []
-    bucket_colors = []
-
-    for low, high, label in buckets:
-        mask = (y_t >= low) & (y_t < high)
-        count = np.sum(mask)
-
-        bucket_labels.append(label)
-        bucket_counts.append(count)
-
-        if count > 0:
-            bucket_errs = errors[mask]
-            b_mae_raw = np.mean(np.abs(bucket_errs))
-            b_mae_ribu = b_mae_raw / 1000.0
-
-            bucket_maes.append(b_mae_ribu)
-
-            if b_mae_raw < 100_000:
-                bucket_colors.append('green')
-            elif b_mae_raw < 200_000:
-                bucket_colors.append('yellow')
-            else:
-                bucket_colors.append('red')
-        else:
-            bucket_maes.append(0.0)
-            bucket_colors.append('gray')
-
-    x_pos = np.arange(len(buckets))
-    bars = ax2.bar(x_pos, bucket_maes, color=bucket_colors, edgecolor='black', alpha=0.7)
-
-    ax2.set_xticks(x_pos)
-    ax2.set_xticklabels(bucket_labels, fontsize=10)
-    ax2.set_xlabel("Tagihan Aktual", fontsize=12)
-    ax2.set_ylabel("MAE (ribu Rp)", fontsize=12)
-    ax2.set_title("Mean Absolute Error per Bucket Tagihan Aktual", fontsize=14, fontweight='bold')
-
-    # Annotate bars with sample counts
-    for bar, count in zip(bars, bucket_counts):
-        height = bar.get_height()
-        if count > 0:
-            ax2.text(bar.get_x() + bar.get_width() / 2.0, height,
-                     f"n={count}", ha='center', va='bottom', fontsize=10)
 
     plt.tight_layout()
 
@@ -355,7 +259,8 @@ def save_metrics_json(metrics: dict, save_path: str):
     print(f"Metrics JSON disimpan ke: {save_path}")
 
 
-def run_training(model_type: str):
+def run_training():
+    model_type = "prabayar"
     cfg = config[model_type]
 
     if not os.path.exists(cfg["dataset_path"]):
@@ -365,7 +270,7 @@ def run_training(model_type: str):
     os.makedirs(os.path.dirname(cfg["model_path"]), exist_ok=True)
     os.makedirs(cfg["metrics_dir"], exist_ok=True)
 
-    print(f"=== Training model {model_type.upper()} ===\n")
+    print(f"=== Training model PRABAYAR ===\n")
     print(f"[INFO] Log transform: {cfg.get('use_log_transform', False)}")
 
     rows, minmax_scaler_params = load_and_preprocess(cfg["dataset_path"])
@@ -418,30 +323,19 @@ def run_training(model_type: str):
     print("-" * 50 + "\n")
 
     # Build layer sizes: [input, ...hidden..., 1]
-    # Input ke Dense/Linear Layer = Numerik + Dimensi_Output_Semua_Embedding
     dense_input_size = input_size + total_embedding_dim
     layer_sizes = [dense_input_size] + cfg["hidden_layers"] + [1]
     print(f"Arsitektur Dense: {layer_sizes}")
 
-    # Build model berdasarkan model_type
-    if model_type == "pascabayar":
-        model = PascabayarModel(
-            layer_sizes=layer_sizes,
-            embedding_configs=embedding_configs,
-            seed=42,
-            clip_value=cfg["clip_value"],
-            l2_lambda=cfg.get("l2_lambda", 0.0),
-        )
-    else:
-        model = PrabayarModel(
-            layer_sizes=layer_sizes,
-            embedding_configs=embedding_configs,
-            seed=42,
-            clip_value=cfg["clip_value"],
-            l2_lambda=cfg.get("l2_lambda", 0.0),
-            asymmetric_alpha=cfg.get("asymmetric_alpha", 0.5),
-            l1_lambda_input=cfg.get("l1_lambda_input")
-        )
+    model = PrabayarModel(
+        layer_sizes=layer_sizes,
+        embedding_configs=embedding_configs,
+        seed=42,
+        clip_value=cfg["clip_value"],
+        l2_lambda=cfg.get("l2_lambda", 0.0),
+        asymmetric_alpha=cfg.get("asymmetric_alpha", 0.5),
+        l1_lambda_input=cfg.get("l1_lambda_input")
+    )
 
     # Train
     print("Mulai training...")
@@ -539,7 +433,7 @@ def run_training(model_type: str):
     plot_error_distribution(
         y_true=y_test,
         y_pred=preds_orig,
-        mae_rupiah=mae_orig,
+        mae_value=mae_orig,
         save_path=os.path.join(metrics_dir, "error_distribution.png"),
         show=False,
     )
@@ -592,22 +486,7 @@ def run_training(model_type: str):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <prabayar|pascabayar|all>")
-        sys.exit(1)
-
-    choice = sys.argv[1].lower()
-
-    if choice == "all":
-        for model_type in config:
-            run_training(model_type)
-            print("\n" + "=" * 60 + "\n")
-    elif choice in config:
-        run_training(choice)
-    else:
-        print(f"Model type tidak dikenal: {choice}")
-        print("Pilih: prabayar, pascabayar, atau all")
-        sys.exit(1)
+    run_training()
 
 
 if __name__ == "__main__":

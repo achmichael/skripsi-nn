@@ -47,7 +47,7 @@ def train_model(
     lr_decay: float = 0.0,
     # ── NEW PARAMETERS ──────────────────────────────────────
     use_log: bool = False,
-    model_type: str = "pascabayar",
+    model_type: str = "prabayar",
     # ────────────────────────────────────────────────────────
 ) -> dict:
     """

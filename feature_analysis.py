@@ -1,8 +1,8 @@
 """
-Feature Analysis untuk Feature Selection.
+Feature Analysis untuk Feature Selection (Prabayar Only).
 Menghitung Permutation Importance tiap fitur terhadap model yang sudah dilatih.
 
-Usage: python feature_analysis.py <prabayar|pascabayar|all>
+Usage: python feature_analysis.py
 """
 
 import json
@@ -53,7 +53,6 @@ def permutation_importance_mse(
     for fi in range(n_num_features):
         deltas = []
         for _ in range(n_repeats):
-            # copy & shuffle column fi
             col = [row[fi] for row in x_test]
             rng.shuffle(col)
             x_perm = [row[:] for row in x_test]
@@ -73,11 +72,9 @@ def permutation_importance_mse(
         for cat_name in cat_feature_names:
             deltas = []
             for _ in range(n_repeats):
-                # Extract specific category column
                 col = [row.get(cat_name, 0) for row in x_cat_test]
                 rng.shuffle(col)
                 
-                # Deep copy dict list
                 x_cat_perm = copy.deepcopy(x_cat_test)
                 for i, row in enumerate(x_cat_perm):
                     row[cat_name] = col[i]
@@ -92,24 +89,24 @@ def permutation_importance_mse(
     return all_names, all_importances
 
 
-def analyze(model_type: str):
+def analyze():
+    model_type = "prabayar"
     cfg = config[model_type]
 
     print(f"\n{'='*70}")
-    print(f"  FEATURE ANALYSIS — {model_type.upper()}")
+    print(f"  FEATURE ANALYSIS — PRABAYAR")
     print(f"{'='*70}\n")
 
     # Load data
     rows, _ = load_and_preprocess(cfg["dataset_path"])
     x_data, x_cat_data, y_data, feature_columns, embedding_configs, target_column = extract_features_and_target(rows, model_type)
     
-    # Hitung tambahan ukuran input dari layer embedding
     total_embedding_dim = sum(e_cfg["dim"] for e_cfg in embedding_configs)
     
     print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur numerik, {len(embedding_configs)} fitur kategori (dim={total_embedding_dim})")
     print(f"Target: {target_column}\n")
 
-    # Split (same seed as training)
+    # Split
     x_train, x_cat_train, x_test, x_cat_test, y_train, y_test = train_test_split(x_data, x_cat_data, y_data, test_ratio=0.2, seed=42)
 
     model_path = cfg["model_path"]
@@ -121,12 +118,8 @@ def analyze(model_type: str):
     print(f"  PERMUTATION IMPORTANCE (model: {model_path})")
     print(f"{'─'*70}")
 
-    if model_type == "prabayar":
-        from src.models.prabayar import PrabayarModel
-        model, _ = PrabayarModel.load(model_path)
-    else:
-        from src.models.pascabayar import PascabayarModel
-        model, _ = PascabayarModel.load(model_path)
+    from src.models.prabayar import PrabayarModel
+    model, _ = PrabayarModel.load(model_path)
 
     # Scale data
     x_scaler = fit_minmax_scaler(x_train)
@@ -155,7 +148,7 @@ def analyze(model_type: str):
     try:
         max_val = float(max([float(i[1].item()) if hasattr(i[1], 'item') else float(i[1]) for i in imp_results]))
     except Exception:
-        max_val = 1.0  # fallback
+        max_val = 1.0
     for rank, (fname, delta) in enumerate(imp_results, 1):
         try:
             delta_val = float(delta.item()) if hasattr(delta, 'item') else float(delta)
@@ -164,10 +157,8 @@ def analyze(model_type: str):
         bar = "█" * max(1, int(delta_val / max_val * 30)) if max_val > 0 and delta_val > 0 else ""
         print(f"{rank:>4} | {fname:<52} | {delta_val:>14.8f} {bar}")
 
-    # ============================================================
-    # SIMPAN HASIL KE JSON
-    # ============================================================
-    output_path = f"results/{model_type}/feature_analysis.json"
+    # Simpan hasil ke JSON
+    output_path = "results/prabayar/feature_analysis.json"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     output = {
@@ -187,19 +178,7 @@ def analyze(model_type: str):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python feature_analysis.py <prabayar|pascabayar|all>")
-        sys.exit(1)
-
-    choice = sys.argv[1].lower()
-    if choice == "all":
-        for mt in ["prabayar", "pascabayar"]:
-            analyze(mt)
-    elif choice in config:
-        analyze(choice)
-    else:
-        print(f"Unknown: {choice}. Use: prabayar, pascabayar, all")
-        sys.exit(1)
+    analyze()
 
 
 if __name__ == "__main__":

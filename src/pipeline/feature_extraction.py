@@ -8,14 +8,14 @@ from src.config.config import config
 
 def extract_features_and_target(
     df: pd.DataFrame,
-    model_type: str,
+    model_type: str = "prabayar",
 ) -> tuple[list[list[float]], list[dict[str, int]], list[float], list[str], list[dict], str]:
     """
-    Extract features and target dari DataFrame berdasarkan model_type.
+    Extract features and target dari DataFrame untuk model prabayar.
 
     Args:
         df        : DataFrame hasil preprocessing.
-        model_type: 'prabayar' atau 'pascabayar'.
+        model_type: 'prabayar'.
 
     Returns:
         (x_data, x_cat_data, y_data, feature_columns, embedding_configs, target_column)
@@ -24,7 +24,7 @@ def extract_features_and_target(
         raise ValueError("Data kosong.")
 
     if model_type not in config["features"]:
-        raise ValueError(f"Model type '{model_type}' tidak dikenal. Gunakan 'prabayar' atau 'pascabayar'.")
+        raise ValueError(f"Model type '{model_type}' tidak dikenal. Gunakan 'prabayar'.")
 
     feature_columns = config["features"][model_type]
     embedding_configs = config.get("embedding_features", {}).get(model_type, [])
@@ -68,4 +68,3 @@ def extract_features_and_target(
     y_data = df[target_column].values.tolist()
 
     return x_data, x_cat_data, y_data, feature_columns, embedding_configs, target_column
-

@@ -1,10 +1,6 @@
 data/
 venv/
 __pycache__/
-# model_*.json
-# results/pascabayar/metrics
-# results/prabayar/metrics
-results/pascabayar_place_value/metrics
 results/tuning/grid_search_*.json
 *.md
 graphify-out/

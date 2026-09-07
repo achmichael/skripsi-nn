@@ -11,44 +11,31 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 from src.pipeline.preprocessing import preprocess, transform_standard_scaler, inverse_transform_target
 from src.pipeline.feature_extraction import extract_features_and_target
-from src.models.pascabayar import PascabayarModel
 from src.models.prabayar import PrabayarModel
 from src.config.config import config
 
-MODEL_PATHS = {
-    "prabayar": os.path.join(BASE_DIR, "results", "prabayar", "models", "model_prabayar.json"),
-    "pascabayar": os.path.join(BASE_DIR, "results", "pascabayar", "models", "model_pascabayar.json"),
-}
+MODEL_PATH = os.path.join(BASE_DIR, "results", "prabayar", "models", "model_prabayar.json")
 
-models = {}
-metadatas = {}
-
-load_errors = {}
+model = None
+metadata_store = None
+load_error = None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Load models on startup
+    global model, metadata_store, load_error
     try:
-        models["prabayar"], metadatas["prabayar"] = PrabayarModel.load(MODEL_PATHS["prabayar"])
+        model, metadata_store = PrabayarModel.load(MODEL_PATH)
         print("Model Prabayar loaded successfully")
     except Exception as e:
-        load_errors["prabayar"] = str(e)
+        load_error = str(e)
         print(f"Failed to load Prabayar model: {e}")
         
-    try:
-        models["pascabayar"], metadatas["pascabayar"] = PascabayarModel.load(MODEL_PATHS["pascabayar"])
-        print("Model Pascabayar loaded successfully")
-    except Exception as e:
-        load_errors["pascabayar"] = str(e)
-        print(f"Failed to load Pascabayar model: {e}")
-        
     yield
-    # Cleanup on shutdown
-    models.clear()
-    metadatas.clear()
-    load_errors.clear()
+    model = None
+    metadata_store = None
+    load_error = None
 
-app = FastAPI(title="Prediksi Listrik API", lifespan=lifespan)
+app = FastAPI(title="Prediksi Listrik Prabayar API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,7 +52,7 @@ def root():
         "status": "success"
     }
 
-def process_inference_data(data: Dict[str, Any], model_type: str, minmax_scaler_params: dict):
+def process_inference_data(data: Dict[str, Any], minmax_scaler_params: dict):
     df_raw = pd.DataFrame([data])
     
     if "Daya_Listrik_Rumah_VA" in df_raw.columns:
@@ -91,7 +78,7 @@ def process_inference_data(data: Dict[str, Any], model_type: str, minmax_scaler_
 
     df_processed, _ = preprocess(df_raw, scaler_params=minmax_scaler_params)
 
-    feature_columns = config["features"][model_type]
+    feature_columns = config["features"]["prabayar"]
     
     input_values = []
     for col in feature_columns:
@@ -106,18 +93,16 @@ def process_inference_data(data: Dict[str, Any], model_type: str, minmax_scaler_
 
 @app.post("/predict/prepaid")
 async def predict_prepaid(data: Dict[str, Any]):
-    if "prabayar" not in models:
-        error_msg = load_errors.get("prabayar", "Unknown error loading model")
+    if model is None:
+        error_msg = load_error or "Unknown error loading model"
         raise HTTPException(status_code=500, detail=f"Model prabayar not loaded. Error: {error_msg}")
         
-    model = models["prabayar"]
-    metadata = metadatas["prabayar"]
-    x_scaler = metadata["x_scaler"]
-    y_scaler = metadata["y_scaler"]
-    minmax_scaler_params = metadata.get("minmax_scaler_params", {})
+    x_scaler = metadata_store["x_scaler"]
+    y_scaler = metadata_store["y_scaler"]
+    minmax_scaler_params = metadata_store.get("minmax_scaler_params", {})
     
     # Preprocess
-    input_values = process_inference_data(data, "prabayar", minmax_scaler_params)
+    input_values = process_inference_data(data, minmax_scaler_params)
         
     # Scale
     x_scaled = transform_standard_scaler([input_values], x_scaler)
@@ -125,49 +110,10 @@ async def predict_prepaid(data: Dict[str, Any]):
     # Predict
     prediction_scaled = float(model.predict(np.array(x_scaled))[0][0])
     
-    # Clip/bound output logis agar exponensial tidak meledak (rentang log1p wajar)
-    # Max log untuk target prabayar misalnya 6.0 (karena ~400 hari maks log1p(400) = 5.99)
+    # Clip/bound output
     if y_scaler.get("use_log", False):
-        prediction_scaled = max(0.0, min(prediction_scaled, 1.5)) # Asumsikan skala [0,1] sedikit overshoot boleh
+        prediction_scaled = max(0.0, min(prediction_scaled, 1.5))
     
-    prediction = inverse_transform_target(prediction_scaled, y_scaler)
-    
-    if math.isinf(prediction) or math.isnan(prediction):
-        prediction = 0.0
-        
-    prediction = max(0.0, float(prediction))
-    
-    return {
-        "success": True,
-        "prediction": round(prediction)
-    }
-
-@app.post("/predict/postpaid")
-async def predict_postpaid(data: Dict[str, Any]):
-    if "pascabayar" not in models:
-        error_msg = load_errors.get("pascabayar", "Unknown error loading model")
-        raise HTTPException(status_code=500, detail=f"Model pascabayar not loaded. Error: {error_msg}")
-        
-    model = models["pascabayar"]
-    metadata = metadatas["pascabayar"]
-    x_scaler = metadata["x_scaler"]
-    y_scaler = metadata["y_scaler"]
-    minmax_scaler_params = metadata.get("minmax_scaler_params", {})
-    
-    # Preprocess
-    input_values = process_inference_data(data, "pascabayar", minmax_scaler_params)
-        
-    # Scale
-    x_scaled = transform_standard_scaler([input_values], x_scaler)
-    
-    # Predict
-    prediction_scaled = float(model.predict(np.array(x_scaled))[0][0])
-    
-    # Clip/bound output logis
-    # Target pascabayar Rp 10rb - 1.5jt. Log1p rentang [9.2, 14.2].
-    if y_scaler.get("use_log", False):
-         prediction_scaled = max(0.0, min(prediction_scaled, 1.5))
-         
     prediction = inverse_transform_target(prediction_scaled, y_scaler)
     
     if math.isinf(prediction) or math.isnan(prediction):
