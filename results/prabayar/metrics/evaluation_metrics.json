@@ -1,0 +1,29 @@
+{
+    "model_type": "prabayar",
+    "arsitektur": [
+        38,
+        48,
+        32,
+        1
+    ],
+    "learning_rate": 0.001,
+    "total_epochs": 130,
+    "final_train_loss": 0.0006379995871067472,
+    "best_train_loss": 0.00047512796159303165,
+    "final_val_loss": 0.006534284132773307,
+    "best_val_loss": 0.006202658577181985,
+    "evaluasi_normalisasi": {
+        "mse": 0.012391560448607848,
+        "mae": 0.08386421106828316
+    },
+    "evaluasi_skala_asli": {
+        "mse": 11.90828959111214,
+        "rmse": 3.450838969165635,
+        "mae": 2.5997905431167783,
+        "mape": 19.939641590462326
+    },
+    "data_split": {
+        "train": 544,
+        "test": 136
+    }
+}

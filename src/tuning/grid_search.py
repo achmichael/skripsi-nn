@@ -55,7 +55,7 @@ import numpy as np
 # Pastikan import src dikenali saat dijalankan langsung
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-# ─── Reuse dari script grid search asli ──────────────────────────────
+# ─── Reuse dari script grid search asli ────
 # Sesuaikan nama modul ini kalau file aslinya bukan train_tuning.py
 from src.tuning.train_tuning import (
     compute_rmse, compute_mae, compute_mape, compute_r2, evaluate_metrics,
@@ -132,6 +132,11 @@ def get_search_space_prabayar(n_features: int) -> dict:
             [n_features, 64, 1],
             [n_features, 128, 1],
             [n_features, 64, 32, 1],
+            [n_features, 64, 48, 1],
+            [n_features, 64, 16, 1],
+            [n_features, 48, 32, 1],
+            [n_features, 48, 16, 1],
+            [n_features, 32, 16, 1],
             [n_features, 128, 64, 1],
         ],
         "learning_rate": [5e-5, 1e-4, 5e-4, 1e-3],
@@ -187,7 +192,7 @@ def train_mlp_early_stop(
         epoch_losses = []
         for start in range(0, n, batch_size):
             end = min(start + batch_size, n)
-            loss = model.train_batch(X_shuf[start:end], Y_shuf[start:end], learning_rate)
+            loss = model.train_batch(X_shuf[start:end], None, Y_shuf[start:end], learning_rate)
             epoch_losses.append(loss)
         epoch_loss = float(np.mean(epoch_losses)) if epoch_losses else float("nan")
 
@@ -468,13 +473,6 @@ def main():
     )
 
     print("\n" + "▓" * 70)
-    print("  LOADING DATA: Pascabayar")
-    print("▓" * 70)
-    (x_tr_p, x_va_p, y_tr_p, y_va_p, y_va_orig_p, n_feat_p, yscaler_p, _) = load_data("pascabayar")
-    print(f"  Train: {len(x_tr_p)} | Val: {len(x_va_p)} | Fitur: {n_feat_p}")
-    results_pasca = tune_pascabayar(x_tr_p, y_tr_p, x_va_p, y_va_p, y_va_orig_p, n_feat_p, yscaler_p, cfg)
-
-    print("\n" + "▓" * 70)
     print("  LOADING DATA: Prabayar")
     print("▓" * 70)
     (x_tr_r, x_va_r, y_tr_r, y_va_r, y_va_orig_r, n_feat_r, yscaler_r, _) = load_data("prabayar")
@@ -482,15 +480,9 @@ def main():
     results_pra = tune_prabayar(x_tr_r, y_tr_r, x_va_r, y_va_r, y_va_orig_r, n_feat_r, yscaler_r, cfg)
 
     print("\n" + "▓" * 70)
-    print("  TUNING: PascabayarPlaceValueModel (reuse data Pascabayar)")
-    print("▓" * 70)
-    results_pv = tune_pv(x_tr_p, y_tr_p, x_va_p, y_va_p, y_va_orig_p, n_feat_p, yscaler_p, cfg)
-
-    print("\n" + "▓" * 70)
     print("  RINGKASAN")
     print("▓" * 70)
-    for name, res in [("PascabayarModel", results_pasca), ("PrabayarModel", results_pra),
-                       ("PascabayarPlaceValueModel", results_pv)]:
+    for name, res in [("PrabayarModel", results_pra)]:
         valid = [r for r in res if not r.get("diverged")]
         print(f"\n  {name}: {len(valid)}/{len(res)} konvergen di rung terakhir")
         if valid:

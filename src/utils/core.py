@@ -34,6 +34,7 @@ def mean_absolute_error(predictions: list[float], targets: list[float]) -> float
 def train_model(
     model: NeuralNetwork,
     x_train: list[list[float]],
+    x_cat_train: list[dict[str, int]],
     y_train: list[float],
     learning_rate: float,
     batch_size: int = 16,
@@ -41,6 +42,7 @@ def train_model(
     min_delta: float = 1e-4,
     epochs: int | None = None,
     x_val: list[list[float]] | None = None,
+    x_cat_val: list[dict[str, int]] | None = None,
     y_val: list[float] | None = None,
     lr_decay: float = 0.0,
     # ── NEW PARAMETERS ──────────────────────────────────────
@@ -98,18 +100,23 @@ def train_model(
             end = min(start + batch_size, n_samples)
             x_batch = X_shuffled[start:end]
             y_batch = y_shuffled[start:end]
+            
+            # Ekstrak data kategorikal sesuai indeks shuffle (bukan array numpy)
+            batch_indices = indices[start:end]
+            x_cat_batch = [x_cat_train[i] for i in batch_indices]
 
-            batch_loss = model.train_batch(x_batch, y_batch, current_lr)
+            batch_loss = model.train_batch(x_batch, x_cat_batch, y_batch, current_lr)
 
             total_train_loss += batch_loss
             n_batches += 1
 
         avg_train_loss = total_train_loss / n_batches
+
         train_loss_history.append(avg_train_loss)
 
         if has_val:
             # Vectorized validation prediction
-            val_preds = model.predict(X_val_np)
+            val_preds = model.predict(X_val_np, x_cat_val)
             avg_val_loss = float(np.mean((val_preds - y_val_np) ** 2) / 2.0)
             val_loss_history.append(avg_val_loss)
             val_info = f" | Val Loss: {avg_val_loss:.8f}"
@@ -150,13 +157,14 @@ def train_model(
 def evaluate_model(
     model: NeuralNetwork,
     x_test: list[list[float]],
+    x_cat_test: list[dict[str, int]],
     y_test: list[float],
 ) -> dict:
     predictions = []
 
     # Can process all at once for speed
     X_test_np = np.array(x_test, dtype=np.float32)
-    preds_np = model.predict(X_test_np)
+    preds_np = model.predict(X_test_np, x_cat_test)
 
     predictions = preds_np.flatten().tolist()
 

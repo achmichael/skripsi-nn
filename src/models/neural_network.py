@@ -19,7 +19,7 @@ class NeuralNetwork(ABC):
     """
 
     @abstractmethod
-    def forward(self, inputs: np.ndarray) -> np.ndarray:
+    def forward(self, inputs: np.ndarray, cat_inputs: list[dict[str, int]] = None) -> np.ndarray:
         ...
 
     @abstractmethod
@@ -30,6 +30,7 @@ class NeuralNetwork(ABC):
     def train_one_sample(
         self,
         inputs: np.ndarray,
+        cat_inputs: dict[str, int],
         target: np.ndarray,
         learning_rate: float,
     ) -> float:
@@ -39,13 +40,18 @@ class NeuralNetwork(ABC):
     def train_batch(
         self,
         x_batch: np.ndarray,
+        x_cat_batch: list[dict[str, int]],
         y_batch: np.ndarray,
         learning_rate: float,
     ) -> float:
         ...
 
     @abstractmethod
-    def predict(self, inputs: np.ndarray) -> np.ndarray:
+    def get_feature_contributions(self) -> np.ndarray:
+        ...
+
+    @abstractmethod
+    def predict(self, inputs: np.ndarray, cat_inputs: list[dict[str, int]] = None) -> np.ndarray:
         ...
 
     @abstractmethod

@@ -4,7 +4,7 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None, # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [128, 64],
+        "hidden_layers": [48, 32],
         "learning_rate": 0.001,
         "patience": 10,
         "min_delta": 1e-5,
@@ -14,7 +14,7 @@ config = {
         "lr_decay": 0.001,         # tambahkan LR decay
         "target_label": "durasi token (hari)",
         "target": "Token_Habis_Dalam_Hari",
-        "use_log_transform": True,
+        "use_log_transform": False,
         "asymmetric_alpha": 0.6,
     },
     "pascabayar": {
@@ -23,7 +23,7 @@ config = {
         "metrics_dir": "results/pascabayar/metrics",
         "layer_sizes": None,  # set dynamically: [input, ...hidden..., 1]
         "hidden_layers": [64],
-        "learning_rate": 0.005,            
+        "learning_rate": 0.005,
         "patience": 10,
         "min_delta": 1e-6,
         "clip_value": 10.0,
@@ -56,146 +56,125 @@ config = {
         "use_log_transform": True,
     },
     "features": {
-        "prabayar": [  
+        "prabayar": [
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
-            # "Status_Subsidi_Listrik",
             "Nominal_Token_Terakhir_Rp",
             "Frekuensi_Isi_Token_Per_Bulan",
-
             "Kulkas_Jumlah",
-            # "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
-
-            # "TV_Jumlah",
-            # "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
-
-            # "AC_Jumlah",
             "AC_EstimasiJamPerHari",
-            # "AC_Energi_kWhPerHari",
-
-            # "Kipas_Jumlah",
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
-
             "RiceCooker_Jumlah",
-            # "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
-
-            # "MesinCuci_Jumlah",
-            # "MesinCuci_Kategori",
-            # "MesinCuci_EstimasiWattPerUnit",
             "MesinCuci_EstimasiFrekuensiPerMinggu",
-            # "MesinCuci_EstimasiDurasiSekaliPakaiJam",
-            # "MesinCuci_Energi_kWhPerHari",
-
             "Alat_Lain_Ada",
-
-            # "Total_Energi_Alat_Lain_kWhPerHari",
             "Total_Energi_Utama_kWhPerHari",
-            # "Total_Energi_Semua_kWhPerHari",
-            
             "Tarif_PLN_Eksak_Rp",
             "Estimasi_kWh_Didapat",
-            # "Estimasi_Fisika_Durasi_Hari",
             "Durasi_Dari_Frekuensi",
             "Rasio_Token_vs_Energi",
-            # "Token_Nominal_Kategori",
             "Energi_Per_Nominal",
-            # "Fisika_vs_Frekuensi_Gap",
             "Rasio_Fisika_vs_Frekuensi",
         ],
-
         "pascabayar": [
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
             "Status_Subsidi_Listrik",
             "Tagihan_Relatif_Stabil__Ya, relatif stabil",
-
             "Kulkas_Jumlah",
             "Kulkas_EstimasiWattPerUnit",
             "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
-
             "TV_Jumlah",
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
-
             "AC_Jumlah",
             "AC_EstimasiWattPerUnit",
             "AC_EstimasiJamPerHari",
             "AC_Energi_kWhPerHari",
-
             "Kipas_Jumlah",
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
-
             "RiceCooker_Jumlah",
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
-
             "MesinCuci_Jumlah",
             "MesinCuci_EstimasiFrekuensiPerMinggu",
             "MesinCuci_Energi_kWhPerHari",
-
             "Alat_Lain_Ada",
-
             "Total_Energi_Alat_Lain_kWhPerHari",
             "Total_Energi_Semua_kWhPerHari",
-
             "Total_Energi_Semua_kWhPerBulan",
             "Estimasi_Tarif_Per_kWh_Rp",
-
             "Estimasi_Biaya_Energi_Bulanan_Rp",
             "Daya_x_TotalEnergi",
-            # "Estimasi_Fisika_Tagihan_Rp",
         ],
         "pascabayar_place_value": [
             "Jumlah_Anggota_Keluarga",
             "Daya_Listrik_Rumah_VA",
             "Status_Subsidi_Listrik",
-            
             "Tagihan_Relatif_Stabil__Ya, relatif stabil",
-
             "Kulkas_Jumlah",
             "Kulkas_EstimasiWattPerUnit",
             "Kulkas_EstimasiJamPerHari",
             "Kulkas_Energi_kWhPerHari",
-
             "TV_Jumlah",
             "TV_EstimasiJamPerHari",
             "TV_Energi_kWhPerHari",
-
             "AC_Jumlah",
             "AC_EstimasiWattPerUnit",
             "AC_EstimasiJamPerHari",
             "AC_Energi_kWhPerHari",
-
             "Kipas_Jumlah",
             "Kipas_EstimasiJamPerHari",
             "Kipas_Energi_kWhPerHari",
-
             "RiceCooker_Jumlah",
             "RiceCooker_EstimasiJamPerHari",
             "RiceCooker_Energi_kWhPerHari",
-
             "MesinCuci_Jumlah",
             "MesinCuci_EstimasiFrekuensiPerMinggu",
             "MesinCuci_Energi_kWhPerHari",
-
             "Alat_Lain_Ada",
-
             "Total_Energi_Alat_Lain_kWhPerHari",
             "Total_Energi_Semua_kWhPerHari",
-
             "Total_Energi_Semua_kWhPerBulan",
             "Estimasi_Tarif_Per_kWh_Rp",
-
             "Estimasi_Biaya_Energi_Bulanan_Rp",
             "Daya_x_TotalEnergi",
             "Estimasi_Fisika_Tagihan_Rp",
         ],
+    },
+
+    "embedding_features": {
+        "prabayar": [
+            {"name": "Kulkas_Kategori", "vocab_size": 4, "dim": 2},
+            {"name": "TV_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "AC_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "Kipas_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "RiceCooker_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "MesinCuci_Kategori", "vocab_size": 5, "dim": 3}
+        ],
+        "pascabayar": [
+            {"name": "Kulkas_Kategori", "vocab_size": 4, "dim": 2},
+            {"name": "TV_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "AC_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "Kipas_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "RiceCooker_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "MesinCuci_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "AC_PK_Kategori", "vocab_size": 6, "dim": 3}
+        ],
+        "pascabayar_place_value": [
+            {"name": "Kulkas_Kategori", "vocab_size": 4, "dim": 2},
+            {"name": "TV_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "AC_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "Kipas_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "RiceCooker_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "MesinCuci_Kategori", "vocab_size": 5, "dim": 3},
+            {"name": "AC_PK_Kategori", "vocab_size": 6, "dim": 3}
+        ]
     },
 
     "numeric_cols": [
@@ -387,8 +366,8 @@ config = {
     # Special numeric values for text in otherwise-numeric columns
     "numeric_special": {
         "Daya_Listrik_Rumah_VA": {
-            "Tidak tahu": 900,    
-            "> 5500": 7700,       
+            "Tidak tahu": 900,
+            "> 5500": 7700,
         },
     },
 
