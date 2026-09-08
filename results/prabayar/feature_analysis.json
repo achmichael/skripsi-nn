@@ -5,112 +5,112 @@
   "n_features": 21,
   "permutation_importance": [
     {
-      "feature": "Frekuensi_Isi_Token_Per_Bulan",
-      "delta_mse": 0.00480954758822918
+      "feature": "Durasi_Dari_Frekuensi",
+      "delta_mse": 0.005698241293430328
     },
     {
-      "feature": "Durasi_Dari_Frekuensi",
-      "delta_mse": 0.003532598540186882
+      "feature": "Frekuensi_Isi_Token_Per_Bulan",
+      "delta_mse": 0.0031144525855779648
     },
     {
       "feature": "Estimasi_kWh_Didapat",
-      "delta_mse": 0.00048443563282489776
-    },
-    {
-      "feature": "Total_Energi_Utama_kWhPerHari",
-      "delta_mse": 0.00029920414090156555
-    },
-    {
-      "feature": "Energi_Per_Nominal",
-      "delta_mse": 0.00015382952988147737
-    },
-    {
-      "feature": "Nominal_Token_Terakhir_Rp",
-      "delta_mse": 0.00015111342072486876
-    },
-    {
-      "feature": "Tarif_PLN_Eksak_Rp",
-      "delta_mse": 0.00013696141541004182
-    },
-    {
-      "feature": "AC_EstimasiJamPerHari",
-      "delta_mse": 0.0001041501760482788
-    },
-    {
-      "feature": "Daya_Listrik_Rumah_VA",
-      "delta_mse": 0.00010111220180988311
-    },
-    {
-      "feature": "RiceCooker_Jumlah",
-      "delta_mse": 8.484832942485809e-05
-    },
-    {
-      "feature": "TV_Energi_kWhPerHari",
-      "delta_mse": 5.0255283713340757e-05
-    },
-    {
-      "feature": "MesinCuci_EstimasiFrekuensiPerMinggu",
-      "delta_mse": -1.8443912267684937e-06
-    },
-    {
-      "feature": "AC_Kategori",
-      "delta_mse": -8.452311158180237e-06
-    },
-    {
-      "feature": "Kipas_EstimasiJamPerHari",
-      "delta_mse": -2.276487648487091e-05
-    },
-    {
-      "feature": "Kulkas_Energi_kWhPerHari",
-      "delta_mse": -2.707280218601227e-05
-    },
-    {
-      "feature": "RiceCooker_Energi_kWhPerHari",
-      "delta_mse": -3.24886292219162e-05
-    },
-    {
-      "feature": "Kipas_Energi_kWhPerHari",
-      "delta_mse": -3.7897005677223204e-05
-    },
-    {
-      "feature": "RiceCooker_Kategori",
-      "delta_mse": -7.773563265800476e-05
-    },
-    {
-      "feature": "Jumlah_Anggota_Keluarga",
-      "delta_mse": -9.813383221626281e-05
-    },
-    {
-      "feature": "Kulkas_Kategori",
-      "delta_mse": -0.00013284794986248016
-    },
-    {
-      "feature": "Rasio_Fisika_vs_Frekuensi",
-      "delta_mse": -0.0001620277762413025
-    },
-    {
-      "feature": "TV_Kategori",
-      "delta_mse": -0.00019869804382324218
-    },
-    {
-      "feature": "MesinCuci_Kategori",
-      "delta_mse": -0.00023269280791282654
-    },
-    {
-      "feature": "Kulkas_Jumlah",
-      "delta_mse": -0.0002736985683441162
+      "delta_mse": 0.0019568614661693573
     },
     {
       "feature": "Rasio_Token_vs_Energi",
-      "delta_mse": -0.0003164038062095642
+      "delta_mse": 0.0008804462850093842
     },
     {
-      "feature": "Alat_Lain_Ada",
-      "delta_mse": -0.00033770985901355744
+      "feature": "Daya_Listrik_Rumah_VA",
+      "delta_mse": 0.0004535473883152008
+    },
+    {
+      "feature": "Energi_Per_Nominal",
+      "delta_mse": 0.0003559675067663193
+    },
+    {
+      "feature": "MesinCuci_EstimasiFrekuensiPerMinggu",
+      "delta_mse": 0.0002173352986574173
+    },
+    {
+      "feature": "Rasio_Fisika_vs_Frekuensi",
+      "delta_mse": 0.0001794334501028061
+    },
+    {
+      "feature": "Kipas_Energi_kWhPerHari",
+      "delta_mse": 0.00016501471400260926
+    },
+    {
+      "feature": "Total_Energi_Utama_kWhPerHari",
+      "delta_mse": 0.00013484917581081391
+    },
+    {
+      "feature": "TV_Energi_kWhPerHari",
+      "delta_mse": 0.00011687129735946656
+    },
+    {
+      "feature": "MesinCuci_Kategori",
+      "delta_mse": 0.0001080639660358429
+    },
+    {
+      "feature": "Kipas_EstimasiJamPerHari",
+      "delta_mse": 9.393766522407532e-05
+    },
+    {
+      "feature": "RiceCooker_Jumlah",
+      "delta_mse": 2.6883184909820555e-05
+    },
+    {
+      "feature": "AC_EstimasiJamPerHari",
+      "delta_mse": -1.712515950202942e-05
+    },
+    {
+      "feature": "RiceCooker_Energi_kWhPerHari",
+      "delta_mse": -2.8897076845169067e-05
+    },
+    {
+      "feature": "Jumlah_Anggota_Keluarga",
+      "delta_mse": -6.676390767097473e-05
+    },
+    {
+      "feature": "TV_Kategori",
+      "delta_mse": -8.537136018276215e-05
+    },
+    {
+      "feature": "Kulkas_Energi_kWhPerHari",
+      "delta_mse": -9.350553154945374e-05
+    },
+    {
+      "feature": "Kulkas_Jumlah",
+      "delta_mse": -0.0002475906163454056
+    },
+    {
+      "feature": "AC_Kategori",
+      "delta_mse": -0.00027226582169532777
     },
     {
       "feature": "Kipas_Kategori",
-      "delta_mse": -0.0007621046155691147
+      "delta_mse": -0.000274769589304924
+    },
+    {
+      "feature": "RiceCooker_Kategori",
+      "delta_mse": -0.0003943227231502533
+    },
+    {
+      "feature": "Alat_Lain_Ada",
+      "delta_mse": -0.0005255527794361115
+    },
+    {
+      "feature": "Tarif_PLN_Eksak_Rp",
+      "delta_mse": -0.0005380742251873017
+    },
+    {
+      "feature": "Kulkas_Kategori",
+      "delta_mse": -0.0006179340183734894
+    },
+    {
+      "feature": "Nominal_Token_Terakhir_Rp",
+      "delta_mse": -0.0007038928568363189
     }
   ]
 }
