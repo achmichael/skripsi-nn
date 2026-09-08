@@ -1,8 +1,8 @@
 """
-Feature Analysis untuk Feature Selection.
+Feature Analysis untuk Feature Selection (Prabayar Only).
 Menghitung Permutation Importance tiap fitur terhadap model yang sudah dilatih.
 
-Usage: python feature_analysis.py <prabayar|pascabayar|all>
+Usage: python feature_analysis.py
 """
 
 import json
@@ -25,55 +25,89 @@ from src.models.neural_network import NeuralNetwork
 def permutation_importance_mse(
     model: NeuralNetwork,
     x_test: list[list[float]],
+    x_cat_test: list[dict[str, int]],
     y_test: list[float],
+    feature_names: list[str],
+    cat_feature_names: list[str],
     n_repeats: int = 5,
     seed: int = 42,
-) -> list[float]:
-    """Permutation importance: shuffle tiap fitur, ukur kenaikan MSE."""
+) -> tuple[list[str], list[float]]:
+    """Permutation importance: shuffle tiap fitur (numerik dan kategorikal), ukur kenaikan MSE."""
     import random
+    import numpy as np
+    import copy
     rng = random.Random(seed)
 
+    x_test_np = np.array(x_test, dtype=np.float32)
+    y_test_np = np.array(y_test, dtype=np.float32).reshape(-1, 1)
+
     # baseline MSE
-    preds_base = [model.forward(x) for x in x_test]
-    base_mse = sum((p - a) ** 2 for p, a in zip(preds_base, y_test)) / len(y_test)
+    preds_base = model.predict(x_test_np, x_cat_test)
+    base_mse = float(np.mean((preds_base - y_test_np) ** 2) / 2.0)
 
-    n_features = len(x_test[0])
-    importances = []
+    all_names = []
+    all_importances = []
 
-    for fi in range(n_features):
+    # 1. Permutasi fitur numerik
+    n_num_features = len(x_test[0])
+    for fi in range(n_num_features):
         deltas = []
         for _ in range(n_repeats):
-            # copy & shuffle column fi
             col = [row[fi] for row in x_test]
             rng.shuffle(col)
             x_perm = [row[:] for row in x_test]
             for i, row in enumerate(x_perm):
                 row[fi] = col[i]
 
-            preds_perm = [model.forward(x) for x in x_perm]
-            perm_mse = sum((p - a) ** 2 for p, a in zip(preds_perm, y_test)) / len(y_test)
+            x_perm_np = np.array(x_perm, dtype=np.float32)
+            preds_perm = model.predict(x_perm_np, x_cat_test)
+            perm_mse = float(np.mean((preds_perm - y_test_np) ** 2) / 2.0)
             deltas.append(perm_mse - base_mse)
 
-        importances.append(sum(deltas) / len(deltas))
+        all_names.append(feature_names[fi])
+        all_importances.append(sum(deltas) / len(deltas))
 
-    return importances
+    # 2. Permutasi fitur kategorikal (Embedding)
+    if x_cat_test and cat_feature_names:
+        for cat_name in cat_feature_names:
+            deltas = []
+            for _ in range(n_repeats):
+                col = [row.get(cat_name, 0) for row in x_cat_test]
+                rng.shuffle(col)
+                
+                x_cat_perm = copy.deepcopy(x_cat_test)
+                for i, row in enumerate(x_cat_perm):
+                    row[cat_name] = col[i]
+                
+                preds_perm = model.predict(x_test_np, x_cat_perm)
+                perm_mse = float(np.mean((preds_perm - y_test_np) ** 2) / 2.0)
+                deltas.append(perm_mse - base_mse)
+
+            all_names.append(cat_name)
+            all_importances.append(sum(deltas) / len(deltas))
+
+    return all_names, all_importances
 
 
-def analyze(model_type: str):
+def analyze():
+    model_type = "prabayar"
     cfg = config[model_type]
 
     print(f"\n{'='*70}")
-    print(f"  FEATURE ANALYSIS — {model_type.upper()}")
+    print(f"  FEATURE ANALYSIS — PRABAYAR")
     print(f"{'='*70}\n")
 
     # Load data
     rows, _ = load_and_preprocess(cfg["dataset_path"])
-    x_data, y_data, feature_columns, target_column = extract_features_and_target(rows, model_type)
-    print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur")
+    x_data, x_cat_data, y_data, feature_columns, embedding_configs, target_column = extract_features_and_target(rows, model_type)
+    
+    total_embedding_dim = sum(e_cfg["dim"] for e_cfg in embedding_configs)
+    
+    print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur numerik, {len(embedding_configs)} fitur kategori (dim={total_embedding_dim})")
     print(f"Target: {target_column}\n")
 
-    # Split (same seed as training)
-    x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_ratio=0.2, seed=42)
+    # Split
+    x_train, x_cat_train, x_test, x_cat_test, y_train, y_test = train_test_split(x_data, x_cat_data, y_data, test_ratio=0.2, seed=42)
 
     model_path = cfg["model_path"]
     if not os.path.exists(model_path):
@@ -84,12 +118,8 @@ def analyze(model_type: str):
     print(f"  PERMUTATION IMPORTANCE (model: {model_path})")
     print(f"{'─'*70}")
 
-    if model_type == "prabayar":
-        from src.models.prabayar import PrabayarModel
-        model, _ = PrabayarModel.load(model_path)
-    else:
-        from src.models.pascabayar import PascabayarModel
-        model, _ = PascabayarModel.load(model_path)
+    from src.models.prabayar import PrabayarModel
+    model, _ = PrabayarModel.load(model_path)
 
     # Scale data
     x_scaler = fit_minmax_scaler(x_train)
@@ -98,9 +128,19 @@ def analyze(model_type: str):
     y_test_scaled = transform_target(y_test, y_scaler)
 
     print("Menghitung permutation importance (5 repeats)...")
-    imp = permutation_importance_mse(model, x_test_scaled, y_test_scaled, n_repeats=5)
+    
+    cat_feature_names = [cfg["name"] for cfg in embedding_configs]
+    all_names, imp = permutation_importance_mse(
+        model, 
+        x_test_scaled, 
+        x_cat_test, 
+        y_test_scaled, 
+        feature_columns,
+        cat_feature_names,
+        n_repeats=5
+    )
 
-    imp_results = list(zip(feature_columns, imp))
+    imp_results = list(zip(all_names, imp))
     imp_results.sort(key=lambda x: x[1], reverse=True)
 
     print(f"\n{'Rank':>4} | {'Fitur':<52} | {'ΔMSE':>14}")
@@ -108,7 +148,7 @@ def analyze(model_type: str):
     try:
         max_val = float(max([float(i[1].item()) if hasattr(i[1], 'item') else float(i[1]) for i in imp_results]))
     except Exception:
-        max_val = 1.0  # fallback
+        max_val = 1.0
     for rank, (fname, delta) in enumerate(imp_results, 1):
         try:
             delta_val = float(delta.item()) if hasattr(delta, 'item') else float(delta)
@@ -117,10 +157,8 @@ def analyze(model_type: str):
         bar = "█" * max(1, int(delta_val / max_val * 30)) if max_val > 0 and delta_val > 0 else ""
         print(f"{rank:>4} | {fname:<52} | {delta_val:>14.8f} {bar}")
 
-    # ============================================================
-    # SIMPAN HASIL KE JSON
-    # ============================================================
-    output_path = f"results/{model_type}/feature_analysis.json"
+    # Simpan hasil ke JSON
+    output_path = "results/prabayar/feature_analysis.json"
     os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
     output = {
@@ -140,19 +178,7 @@ def analyze(model_type: str):
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: python feature_analysis.py <prabayar|pascabayar|all>")
-        sys.exit(1)
-
-    choice = sys.argv[1].lower()
-    if choice == "all":
-        for mt in ["prabayar", "pascabayar"]:
-            analyze(mt)
-    elif choice in config:
-        analyze(choice)
-    else:
-        print(f"Unknown: {choice}. Use: prabayar, pascabayar, all")
-        sys.exit(1)
+    analyze()
 
 
 if __name__ == "__main__":
