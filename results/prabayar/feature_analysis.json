@@ -54,31 +54,31 @@
     },
     {
       "feature": "Kipas_EstimasiJamPerHari",
-      "delta_mse": 9.393766522407532e-05
+      "delta_mse": 9.393766522407532e-5
     },
     {
       "feature": "RiceCooker_Jumlah",
-      "delta_mse": 2.6883184909820555e-05
+      "delta_mse": 2.6883184909820555e-5
     },
     {
       "feature": "AC_EstimasiJamPerHari",
-      "delta_mse": -1.712515950202942e-05
+      "delta_mse": -1.712515950202942e-5
     },
     {
       "feature": "RiceCooker_Energi_kWhPerHari",
-      "delta_mse": -2.8897076845169067e-05
+      "delta_mse": -2.8897076845169067e-5
     },
     {
       "feature": "Jumlah_Anggota_Keluarga",
-      "delta_mse": -6.676390767097473e-05
+      "delta_mse": -6.676390767097473e-5
     },
     {
       "feature": "TV_Kategori",
-      "delta_mse": -8.537136018276215e-05
+      "delta_mse": -8.537136018276215e-5
     },
     {
       "feature": "Kulkas_Energi_kWhPerHari",
-      "delta_mse": -9.350553154945374e-05
+      "delta_mse": -9.350553154945374e-5
     },
     {
       "feature": "Kulkas_Jumlah",

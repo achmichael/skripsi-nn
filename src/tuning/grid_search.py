@@ -108,7 +108,7 @@ def train_mlp_early_stop(
         epoch_losses = []
         for start in range(0, n, batch_size):
             end = min(start + batch_size, n)
-            loss = model.train_batch(X_shuf[start:end], None, Y_shuf[start:end], learning_rate)
+            loss = model.train_batch(X_shuf[start:end], Y_shuf[start:end], learning_rate)
             epoch_losses.append(loss)
         epoch_loss = float(np.mean(epoch_losses)) if epoch_losses else float("nan")
 

@@ -277,24 +277,18 @@ def run_training():
     print(f"Total data: {len(rows)} baris")
 
     # Extract features & target
-    x_data, x_cat_data, y_data, feature_columns, embedding_configs, target_column = extract_features_and_target(
+    x_data, y_data, feature_columns, target_column = extract_features_and_target(
         df=rows,
         model_type=model_type,
     )
     input_size = len(feature_columns)
 
-    # Hitung tambahan ukuran input dari layer embedding
-    total_embedding_dim = sum(cfg["dim"] for cfg in embedding_configs)
-
     print(f"Fitur Numerik: {input_size} kolom")
-    print(f"Fitur Kategori (Embedding): {len(embedding_configs)} kolom, dimensi output = {total_embedding_dim}")
-    print(f"Total Input Dense Layer: {input_size + total_embedding_dim}")
     print(f"Target: {target_column}\n")
 
     # Split
-    x_train, x_cat_train, x_test, x_cat_test, y_train, y_test = train_test_split(
+    x_train, x_test, y_train, y_test = train_test_split(
         x_data=x_data,
-        x_cat_data=x_cat_data,
         y_data=y_data,
         test_ratio=0.2,
         seed=42,
@@ -323,13 +317,11 @@ def run_training():
     print("-" * 50 + "\n")
 
     # Build layer sizes: [input, ...hidden..., 1]
-    dense_input_size = input_size + total_embedding_dim
-    layer_sizes = [dense_input_size] + cfg["hidden_layers"] + [1]
+    layer_sizes = [input_size] + cfg["hidden_layers"] + [1]
     print(f"Arsitektur Dense: {layer_sizes}")
 
     model = PrabayarModel(
         layer_sizes=layer_sizes,
-        embedding_configs=embedding_configs,
         seed=42,
         clip_value=cfg["clip_value"],
         l2_lambda=cfg.get("l2_lambda", 0.0),
@@ -342,7 +334,6 @@ def run_training():
     history = train_model(
         model=model,
         x_train=x_train_scaled,
-        x_cat_train=x_cat_train,
         y_train=y_train_scaled,
         learning_rate=cfg["learning_rate"],
         batch_size=cfg.get("batch_size", 16),
@@ -350,7 +341,6 @@ def run_training():
         min_delta=cfg["min_delta"],
         epochs=None,
         x_val=x_test_scaled,
-        x_cat_val=x_cat_test,
         y_val=y_test_scaled,
         lr_decay=cfg.get("lr_decay", 0.0),
         use_log=cfg.get("use_log_transform", False),
@@ -372,7 +362,6 @@ def run_training():
     evaluation = evaluate_model(
         model=model,
         x_test=x_test_scaled,
-        x_cat_test=x_cat_test,
         y_test=y_test_scaled,
     )
 

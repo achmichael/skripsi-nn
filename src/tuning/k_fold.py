@@ -40,15 +40,14 @@ from src.config.config import config
 
 def k_fold_split(
     x_data: list,
-    x_cat_data: list,
     y_data: list,
     k: int = 5,
     seed: int = 42,
 ) -> list[dict]:
     """
     Split data into k folds. Returns list of k dicts, each containing:
-        - x_train, x_cat_train, y_train
-        - x_val, x_cat_val, y_val
+        - x_train, y_train
+        - x_val, y_val
     """
     n = len(x_data)
     if k < 2:
@@ -80,10 +79,8 @@ def k_fold_split(
 
         splits.append({
             "x_train": [x_data[i] for i in train_indices],
-            "x_cat_train": [x_cat_data[i] for i in train_indices],
             "y_train": [y_data[i] for i in train_indices],
             "x_val": [x_data[i] for i in val_indices],
-            "x_cat_val": [x_cat_data[i] for i in val_indices],
             "y_val": [y_data[i] for i in val_indices],
         })
 
@@ -124,7 +121,7 @@ def train_fold(
         epoch_losses = []
         for start in range(0, n, batch_size):
             end = min(start + batch_size, n)
-            loss = model.train_batch(X_shuf[start:end], None, Y_shuf[start:end], learning_rate)
+            loss = model.train_batch(X_shuf[start:end], Y_shuf[start:end], learning_rate)
             epoch_losses.append(loss)
         epoch_loss = float(np.mean(epoch_losses)) if epoch_losses else float("nan")
 
@@ -167,9 +164,9 @@ def load_raw_data(model_type: str = "prabayar"):
     """Load and preprocess CSV, extract features. No train/test split, no scaling."""
     cfg = config[model_type]
     df, _ = load_and_preprocess(cfg["dataset_path"])
-    x_data, x_cat_data, y_data, feat_cols, embedding_configs, target_col = extract_features_and_target(df, model_type)
+    x_data, y_data, feat_cols, target_col = extract_features_and_target(df, model_type)
     n_features = len(feat_cols)
-    return x_data, x_cat_data, y_data, n_features, feat_cols
+    return x_data, y_data, n_features, feat_cols
 
 
 # =====================================================================
@@ -213,7 +210,7 @@ def run_kfold_cv(
     print(f"{'▓' * 70}")
 
     # 1. Load raw data
-    x_data, x_cat_data, y_data, n_features, feat_cols = load_raw_data(model_type)
+    x_data, y_data, n_features, feat_cols = load_raw_data(model_type)
     print(f"  Total samples: {len(x_data)} | Features: {n_features}")
 
     ls = layer_sizes if layer_sizes is not None else [n_features] + cfg["hidden_layers"] + [1]
@@ -221,7 +218,7 @@ def run_kfold_cv(
     print(f"  LR={lr} | batch={bs} | clip={cv} | L2={l2} | epochs={max_epochs}")
 
     # 2. Create k-fold splits
-    splits = k_fold_split(x_data, x_cat_data, y_data, k=k, seed=seed)
+    splits = k_fold_split(x_data, y_data, k=k, seed=seed)
 
     fold_metrics = []
     all_y_true = []

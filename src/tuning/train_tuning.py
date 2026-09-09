@@ -97,12 +97,12 @@ def load_data(model_type: str = "prabayar"):
     df, _ = load_and_preprocess(cfg["dataset_path"])
     
     # 2. Ekstrak target dan fitur
-    x_data, x_cat_data, y_data, feat_cols, embedding_configs, target_col = extract_features_and_target(df, model_type)
+    x_data, y_data, feat_cols, target_col = extract_features_and_target(df, model_type)
     n_features = len(feat_cols)
     
     # 3. Split 80/20
-    x_train, x_cat_train, x_val, x_cat_val, y_train, y_val = train_test_split(
-        x_data, x_cat_data, y_data, test_ratio=0.2, seed=42
+    x_train, x_val, y_train, y_val = train_test_split(
+        x_data, y_data, test_ratio=0.2, seed=42
     )
     
     # 4. Standard scaler pada fitur
@@ -120,11 +120,11 @@ def load_data(model_type: str = "prabayar"):
     
     return (
         x_train_scaled, 
-        x_val_scaled, 
+        x_val_scaled,
         y_train_scaled, 
         y_val_scaled, 
         y_val_original, 
         n_features, 
         y_scaler, 
-        feat_cols
+        feat_cols,
     )

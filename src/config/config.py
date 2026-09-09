@@ -4,13 +4,13 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None, # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [48, 32],
+        "hidden_layers": [128, 64],
         "learning_rate": 0.001,
         "patience": 10,
         "min_delta": 1e-5,
-        "clip_value": 1.0,
+        "clip_value": 5.0,
         "batch_size": 16,
-        "l2_lambda": 1e-2,
+        "l2_lambda": 1e-1,
         "lr_decay": 0.001,
         "target_label": "durasi token (hari)",
         "target": "Token_Habis_Dalam_Hari",
@@ -41,17 +41,6 @@ config = {
             "Rasio_Token_vs_Energi",
             "Energi_Per_Nominal",
             "Rasio_Fisika_vs_Frekuensi",
-        ],
-    },
-
-    "embedding_features": {
-        "prabayar": [
-            {"name": "Kulkas_Kategori", "vocab_size": 4, "dim": 2},
-            {"name": "TV_Kategori", "vocab_size": 5, "dim": 3},
-            {"name": "AC_Kategori", "vocab_size": 5, "dim": 3},
-            {"name": "Kipas_Kategori", "vocab_size": 5, "dim": 3},
-            {"name": "RiceCooker_Kategori", "vocab_size": 5, "dim": 3},
-            {"name": "MesinCuci_Kategori", "vocab_size": 5, "dim": 3}
         ],
     },
 
@@ -112,10 +101,10 @@ config = {
     "ordinal_encoding": {
         "Kulkas_Kategori": {
             "Tidak ada": 0,
-            "Tidak tahu": 1,
-            "Kecil / 1 pintu": 2,
-            "Sedang / 2 pintu": 3,
-            "Besar / side by side": 4,
+            "Tidak tahu": 0,
+            "Kecil / 1 pintu": 1,
+            "Sedang / 2 pintu": 2,
+            "Besar / side by side": 3,
         },
         "TV_Kategori": {
             "Tidak ada / tidak digunakan": 0,
