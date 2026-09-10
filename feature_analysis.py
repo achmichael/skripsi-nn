@@ -25,14 +25,12 @@ from src.models.neural_network import NeuralNetwork
 def permutation_importance_mse(
     model: NeuralNetwork,
     x_test: list[list[float]],
-    x_cat_test: list[dict[str, int]],
     y_test: list[float],
     feature_names: list[str],
-    cat_feature_names: list[str],
     n_repeats: int = 5,
     seed: int = 42,
 ) -> tuple[list[str], list[float]]:
-    """Permutation importance: shuffle tiap fitur (numerik dan kategorikal), ukur kenaikan MSE."""
+    """Permutation importance: shuffle tiap fitur, ukur kenaikan MSE."""
     import random
     import numpy as np
     import copy
@@ -42,7 +40,7 @@ def permutation_importance_mse(
     y_test_np = np.array(y_test, dtype=np.float32).reshape(-1, 1)
 
     # baseline MSE
-    preds_base = model.predict(x_test_np, x_cat_test)
+    preds_base = model.predict(x_test_np)
     base_mse = float(np.mean((preds_base - y_test_np) ** 2) / 2.0)
 
     all_names = []
@@ -60,31 +58,12 @@ def permutation_importance_mse(
                 row[fi] = col[i]
 
             x_perm_np = np.array(x_perm, dtype=np.float32)
-            preds_perm = model.predict(x_perm_np, x_cat_test)
+            preds_perm = model.predict(x_perm_np)
             perm_mse = float(np.mean((preds_perm - y_test_np) ** 2) / 2.0)
             deltas.append(perm_mse - base_mse)
 
         all_names.append(feature_names[fi])
         all_importances.append(sum(deltas) / len(deltas))
-
-    # 2. Permutasi fitur kategorikal (Embedding)
-    if x_cat_test and cat_feature_names:
-        for cat_name in cat_feature_names:
-            deltas = []
-            for _ in range(n_repeats):
-                col = [row.get(cat_name, 0) for row in x_cat_test]
-                rng.shuffle(col)
-                
-                x_cat_perm = copy.deepcopy(x_cat_test)
-                for i, row in enumerate(x_cat_perm):
-                    row[cat_name] = col[i]
-                
-                preds_perm = model.predict(x_test_np, x_cat_perm)
-                perm_mse = float(np.mean((preds_perm - y_test_np) ** 2) / 2.0)
-                deltas.append(perm_mse - base_mse)
-
-            all_names.append(cat_name)
-            all_importances.append(sum(deltas) / len(deltas))
 
     return all_names, all_importances
 
@@ -99,15 +78,13 @@ def analyze():
 
     # Load data
     rows, _ = load_and_preprocess(cfg["dataset_path"])
-    x_data, x_cat_data, y_data, feature_columns, embedding_configs, target_column = extract_features_and_target(rows, model_type)
+    x_data, y_data, feature_columns, target_column = extract_features_and_target(rows, model_type)
     
-    total_embedding_dim = sum(e_cfg["dim"] for e_cfg in embedding_configs)
-    
-    print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur numerik, {len(embedding_configs)} fitur kategori (dim={total_embedding_dim})")
+    print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur numerik")
     print(f"Target: {target_column}\n")
 
     # Split
-    x_train, x_cat_train, x_test, x_cat_test, y_train, y_test = train_test_split(x_data, x_cat_data, y_data, test_ratio=0.2, seed=42)
+    x_train, x_test, y_train, y_test = train_test_split(x_data, y_data, test_ratio=0.2, seed=42)
 
     model_path = cfg["model_path"]
     if not os.path.exists(model_path):
@@ -129,14 +106,11 @@ def analyze():
 
     print("Menghitung permutation importance (5 repeats)...")
     
-    cat_feature_names = [cfg["name"] for cfg in embedding_configs]
     all_names, imp = permutation_importance_mse(
         model, 
         x_test_scaled, 
-        x_cat_test, 
         y_test_scaled, 
         feature_columns,
-        cat_feature_names,
         n_repeats=5
     )
 
