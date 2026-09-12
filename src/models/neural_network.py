@@ -45,6 +45,15 @@ class NeuralNetwork(ABC):
         ...
 
     @abstractmethod
+    def input_gradients(self, x):
+        """
+        Menghitung gradient output model terhadap input.
+        Return:
+            Gradient dengan bentuk yang sama dengan input (x)
+        """
+        ...
+
+    @abstractmethod
     def get_feature_contributions(self) -> np.ndarray:
         ...
 

@@ -86,6 +86,27 @@ class PrabayarModel(NeuralNetwork):
     def backward(self, target: np.ndarray, learning_rate: float) -> None:
         pass # Only train_batch is used in optimization
 
+
+    def input_gradients(self, x: np.ndarray) -> np.ndarray:
+        if x.ndim == 1:
+            x = x.reshape(1, -1)
+
+        # forward pass untuk mendapatkan activations
+        prediction = self.forward(x)
+        # Backward pass dari output ke input
+        # Gradient dari output layer (MSE derivative untuk regression)
+        grad = np.ones_like(prediction)
+        for l in range(self.num_layers - 2, -1, 1):
+            # gradient bobot
+            grad = np.dot(grad, self.weights[l])
+
+            # gradient melalui activations (ReLU) jika bukan input layer
+            if l > 0:
+                grad *= relu_derivative(self._pre_activations[l-1])
+
+        return grad.flatten() if x.shape[0] == 1 else grad
+
+
     def train_one_sample(
         self,
         inputs: np.ndarray,
@@ -225,16 +246,27 @@ class PrabayarModel(NeuralNetwork):
 
     def get_feature_contributions(self) -> np.ndarray:
         """
-        Menghitung tingkat kontribusi tiap fitur input berdasarkan
-        rata-rata magnitudo bobot absolut di layer pertama.
+        Menghitung kontribusi relatif setiap fitur input berdasarkan
+        connection weights dari input hingga output.
         """
+
         if not self.weights:
             return np.array([])
 
-        importance_scores = np.mean(np.abs(self.weights[0]), axis=0)
+        W1 = self.weights[0]  # (128, 21)
+        W2 = self.weights[1]  # (64, 128)
+        W3 = self.weights[2]  # (1, 64)
 
-        total_score = np.sum(importance_scores)
-        if total_score > 0:
-            importance_scores = importance_scores / total_score
+        # Ubah orientasi menjadi:
+        # (21, 128) @ (128, 64) @ (64, 1)
+        contributions = W1.T @ W2.T @ W3.T
 
-        return importance_scores
+        contributions = contributions.flatten()
+
+        # Relative importance berdasarkan magnitudo
+        total = np.sum(np.abs(contributions))
+
+        if total > 0:
+            contributions = contributions / total
+
+        return contributions

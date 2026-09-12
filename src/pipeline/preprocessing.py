@@ -18,7 +18,6 @@ import pandas as pd
 
 from src.config.config import config
 
-
 # =====================================================================
 # MAPPING DICTIONARIES
 # =====================================================================
@@ -102,10 +101,12 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
         categories = config["ohe_fixed_categories"].get(col, sorted(df[col].dropna().unique()))
 
         for cat in categories:
-            col_name = f"{col}__{cat}"
+            col_name = f"{col}_{cat}"
             df[col_name] = (df[col] == cat).astype(int)
 
         df = df.drop(columns=[col])
+
+    print('df setelah one hot', df)
 
     # =================================================================
     # STEP 3: Ordinal Encoding Rapat (0-based, consecutive)
