@@ -96,7 +96,7 @@ class PrabayarModel(NeuralNetwork):
         # Backward pass dari output ke input
         # Gradient dari output layer (MSE derivative untuk regression)
         grad = np.ones_like(prediction)
-        for l in range(self.num_layers - 2, -1, 1):
+        for l in range(self.num_layers - 2, -1, -1):
             # gradient bobot
             grad = np.dot(grad, self.weights[l])
 
