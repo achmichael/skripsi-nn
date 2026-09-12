@@ -18,7 +18,6 @@ import pandas as pd
 
 from src.config.config import config
 
-
 # =====================================================================
 # MAPPING DICTIONARIES
 # =====================================================================
@@ -102,10 +101,12 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
         categories = config["ohe_fixed_categories"].get(col, sorted(df[col].dropna().unique()))
 
         for cat in categories:
-            col_name = f"{col}__{cat}"
+            col_name = f"{col}_{cat}"
             df[col_name] = (df[col] == cat).astype(int)
 
         df = df.drop(columns=[col])
+
+    print('df setelah one hot', df)
 
     # =================================================================
     # STEP 3: Ordinal Encoding Rapat (0-based, consecutive)
@@ -246,12 +247,11 @@ def load_and_preprocess(path: str) -> tuple[pd.DataFrame, dict]:
 
 def train_test_split(
     x_data: list[list[float]],
-    x_cat_data: list[dict[str, int]],
     y_data: list[float],
     test_ratio: float = 0.2,
     seed: int = 42,
 ):
-    combined = list(zip(x_data, x_cat_data, y_data))
+    combined = list(zip(x_data, y_data))
 
     random.seed(seed)
     random.shuffle(combined)
@@ -262,14 +262,12 @@ def train_test_split(
     train_data = combined[test_size:]
 
     x_train = [item[0] for item in train_data]
-    x_cat_train = [item[1] for item in train_data]
-    y_train = [item[2] for item in train_data]
+    y_train = [item[1] for item in train_data]
 
     x_test = [item[0] for item in test_data]
-    x_cat_test = [item[1] for item in test_data]
-    y_test = [item[2] for item in test_data]
+    y_test = [item[1] for item in test_data]
 
-    return x_train, x_cat_train, x_test, x_cat_test, y_train, y_test
+    return x_train, x_test, y_train, y_test
 
 
 # =====================================================================
