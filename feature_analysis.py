@@ -77,7 +77,7 @@ def analyze():
     print(f"{'='*70}\n")
 
     # Load data
-    rows, _ = load_and_preprocess(cfg["dataset_path"])
+    rows, _, _ = load_and_preprocess(cfg["dataset_path"])
     x_data, y_data, feature_columns, target_column = extract_features_and_target(rows, model_type)
     
     print(f"Dataset: {len(rows)} baris, {len(feature_columns)} fitur numerik")

@@ -9,7 +9,7 @@ import math
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-from src.pipeline.preprocessing import preprocess, transform_standard_scaler, inverse_transform_target
+from src.pipeline.preprocessing import preprocess, transform_standard_scaler, inverse_transform_target, apply_probability_binary, apply_probability_one_hot
 from src.pipeline.feature_extraction import extract_features_and_target
 from src.models.prabayar import PrabayarModel
 from src.config.config import config
@@ -52,7 +52,7 @@ def root():
         "status": "success"
     }
 
-def process_inference_data(data: Dict[str, Any], minmax_scaler_params: dict):
+def process_inference_data(data: Dict[str, Any], minmax_scaler_params: dict, prob_params: dict):
     df_raw = pd.DataFrame([data])
     
     if "Daya_Listrik_Rumah_VA" in df_raw.columns:
@@ -76,7 +76,7 @@ def process_inference_data(data: Dict[str, Any], minmax_scaler_params: dict):
             "Ya": 1,
         }).fillna(0).astype(float)
 
-    df_processed, _ = preprocess(df_raw, scaler_params=minmax_scaler_params)
+    df_processed, _, _ = preprocess(df_raw, scaler_params=minmax_scaler_params, prob_params=prob_params)
 
     feature_columns = config["features"]["prabayar"]
     
@@ -100,9 +100,10 @@ async def predict_prepaid(data: Dict[str, Any]):
     x_scaler = metadata_store["x_scaler"]
     y_scaler = metadata_store["y_scaler"]
     minmax_scaler_params = metadata_store.get("minmax_scaler_params", {})
+    prob_params = metadata_store.get("prob_params", {})
     
     # Preprocess
-    input_values = process_inference_data(data, minmax_scaler_params)
+    input_values = process_inference_data(data, minmax_scaler_params, prob_params)
         
     # Scale
     x_scaled = transform_standard_scaler([input_values], x_scaler)

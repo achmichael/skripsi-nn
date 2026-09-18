@@ -4,7 +4,7 @@ config = {
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None, # set dynamically: [input, 64, 32, 1]
-        "hidden_layers": [64, 32],
+        "hidden_layers": [128, 64],
         "learning_rate": 0.001,
         "patience": 10,
         "min_delta": 1e-5,
@@ -284,6 +284,22 @@ config = {
         "Alat_Lain_2_Jenis",
         "Alat_Lain_3_Jenis"
     ],
+
+    # Kolom yang menggunakan probability encoding
+    # Nilai biner (0/1) diganti dengan probabilitas kemunculan kategori dari data training
+    "probability_encoding_cols": {
+        # Kolom binary mapping: nilai 1 diganti P(kategori aktif)
+        "binary": [
+            "Status_Subsidi_Listrik",
+            "Alat_Lain_Ada",
+        ],
+        # Kolom one-hot: nilai 1 di tiap kolom OHE diganti P(kategori tersebut)
+        "one_hot": [
+            "Alat_Lain_1_Jenis",
+            "Alat_Lain_2_Jenis",
+            "Alat_Lain_3_Jenis",
+        ],
+    },
     "ohe_fixed_categories": {
         "Alat_Lain_1_Jenis": [
             "Charger HP/perangkat kecil",

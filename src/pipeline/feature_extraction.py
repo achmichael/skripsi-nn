@@ -30,7 +30,9 @@ def extract_features_and_target(
     target_column = config[model_type]["target"]
 
     # Validate columns exist
-    available_columns = set(df.columns)
+    available_columns = list(df.columns)
+    available_set = set(available_columns)
+
     # missing = [col for col in feature_columns if col not in available_columns]
 
     missing = []
@@ -40,10 +42,20 @@ def extract_features_and_target(
             resolved_columns.append(col)
             continue
 
+        expanded = [c for c in available_columns if c.startswith(f"{col}_")]
+
+        if expanded:
+            resolved_columns.extend(expanded)
+        else:
+            missing.append(col)
+
     if missing:
         raise ValueError(f"Kolom fitur numerik tidak ditemukan di dataset: {missing}")
 
     feature_columns = resolved_columns
+
+    for col in feature_columns:
+        print('col', col)
 
     print('feature_columns length', len(feature_columns))
     if target_column not in available_columns:

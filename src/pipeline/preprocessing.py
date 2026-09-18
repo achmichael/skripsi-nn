@@ -3,9 +3,11 @@ Preprocessing Pipeline — Manual implementation tanpa scikit-learn.
 
 Pipeline:
   1. Noise removal: "Tidak tahu" / "Tidak diisi" → NaN, lalu imputasi modus manual.
-  2. Ordinal encoding rapat (0-based, no gap): kolom frekuensi/ukuran.
-  3. Feature Engineering (prabayar).
-  4. Standard scaling pada fitur numerik.
+  2. One-Hot Encoding untuk kolom nominal.
+  2b. Probability Encoding: nilai biner (0/1) diganti probabilitas kemunculan kategori.
+  3. Ordinal encoding rapat (0-based, no gap): kolom frekuensi/ukuran.
+  4. Feature Engineering (prabayar).
+  5. Standard scaling pada fitur numerik.
 
 Juga menyediakan: train_test_split, fit/transform MinMax & Standard Scaler untuk fitur & target.
 """
@@ -60,10 +62,131 @@ def manual_minmax(series: pd.Series) -> pd.Series:
 
 
 # =====================================================================
+# PROBABILITY ENCODING
+# =====================================================================
+
+def fit_probability_encoder(df: pd.DataFrame) -> dict:
+    """
+    Hitung probabilitas kemunculan setiap kategori dari data training
+    untuk kolom binary mapping dan one-hot encoding.
+
+    Returns:
+        Dictionary berisi probabilitas per kolom per kategori.
+        {
+            "binary": {
+                "Status_Subsidi_Listrik": {"Subsidi": 0.365, "Non Subsidi": 0.635},
+                ...
+            },
+            "one_hot": {
+                "Alat_Lain_1_Jenis": {"Setrika": 0.068, "Dispenser": 0.046, ...},
+                ...
+            }
+        }
+    """
+    prob_config = config.get("probability_encoding_cols", {})
+    prob_params: dict = {"binary": {}, "one_hot": {}}
+
+    # Binary columns — hitung P(setiap nilai)
+    for col in prob_config.get("binary", []):
+        if col not in df.columns:
+            continue
+        counts = df[col].value_counts(dropna=True)
+        total = counts.sum()
+        if total == 0:
+            continue
+        prob_params["binary"][col] = {
+            str(val): float(cnt / total) for val, cnt in counts.items()
+        }
+
+    # One-hot columns — hitung P(setiap kategori)
+    for col in prob_config.get("one_hot", []):
+        if col not in df.columns:
+            continue
+        counts = df[col].value_counts(dropna=True)
+        total = counts.sum()
+        if total == 0:
+            continue
+        prob_params["one_hot"][col] = {
+            str(val): float(cnt / total) for val, cnt in counts.items()
+        }
+
+    return prob_params
+
+
+def apply_probability_binary(
+    df: pd.DataFrame,
+    prob_params: dict,
+) -> pd.DataFrame:
+    """
+    Terapkan probability encoding pada kolom binary.
+    Kolom sudah di-map ke 0/1 sebelumnya.
+    Ganti nilai 1 dengan P(kategori aktif), 0 dengan P(kategori tidak aktif).
+
+    Mapping yang digunakan:
+      - Status_Subsidi_Listrik: Subsidi→0, Non Subsidi→1
+      - Alat_Lain_Ada: Tidak→0, Ya→1
+
+    Setelah probability encoding:
+      - Nilai 0 (kategori pertama)  → P(kategori pertama)
+      - Nilai 1 (kategori kedua)    → P(kategori kedua)
+    """
+    binary_probs = prob_params.get("binary", {})
+
+    # Mapping dari kolom ke {original_label: encoded_value}
+    binary_label_maps = {
+        "Status_Subsidi_Listrik": {"Subsidi": 0, "Non Subsidi": 1},
+        "Alat_Lain_Ada": {"Tidak": 0, "Ya": 1},
+    }
+
+    for col, cat_probs in binary_probs.items():
+        if col not in df.columns:
+            continue
+
+        label_map = binary_label_maps.get(col, {})
+        # Bangun mapping: encoded_value → probability
+        encoded_to_prob = {}
+        for label, encoded_val in label_map.items():
+            prob = cat_probs.get(label, 0.0)
+            encoded_to_prob[float(encoded_val)] = prob
+
+        df[col] = df[col].map(encoded_to_prob).fillna(df[col])
+
+    return df
+
+
+def apply_probability_one_hot(
+    df: pd.DataFrame,
+    prob_params: dict,
+    ohe_fixed_categories: dict,
+) -> pd.DataFrame:
+    """
+    Terapkan probability encoding pada kolom one-hot.
+    Setelah OHE, setiap kolom `{col}_{cat}` bernilai 0 atau 1.
+    Ganti nilai 1 dengan P(kategori tersebut dari data training).
+    Nilai 0 tetap 0 (kategori tidak aktif).
+    """
+    ohe_probs = prob_params.get("one_hot", {})
+
+    for col, cat_probs in ohe_probs.items():
+        categories = ohe_fixed_categories.get(col, [])
+        for cat in categories:
+            col_name = f"{col}_{cat}"
+            if col_name not in df.columns:
+                continue
+            prob = cat_probs.get(cat, 0.0)
+            # Dimana nilai == 1, ganti dengan probabilitas
+            df[col_name] = df[col_name].apply(
+                lambda x, p=prob: p if x == 1 else 0.0
+            )
+
+    return df
+
+
+# =====================================================================
 # MAIN PREPROCESSING
 # =====================================================================
 
-def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.DataFrame, dict]:
+def preprocess(df: pd.DataFrame, scaler_params: dict | None = None, prob_params: dict | None = None) -> tuple[pd.DataFrame, dict, dict]:
     """
     Full preprocessing pipeline untuk model prabayar.
     """
@@ -107,6 +230,24 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
         df = df.drop(columns=[col])
 
     print('df setelah one hot', df)
+
+    # =================================================================
+    # STEP 2b: Probability Encoding
+    # =================================================================
+    # Jika prob_params belum ada (training), fit dari data saat ini
+    # Jika sudah ada (inference), gunakan yang sudah di-fit
+    if prob_params is None:
+        # Ini akan di-fit ulang di load_and_preprocess sebelum OHE
+        # Tapi sebagai fallback, kita skip di sini
+        out_prob_params = {}
+    else:
+        out_prob_params = prob_params
+        # Apply probability encoding pada kolom binary
+        df = apply_probability_binary(df, prob_params)
+        # Apply probability encoding pada kolom one-hot
+        df = apply_probability_one_hot(
+            df, prob_params, config.get("ohe_fixed_categories", {})
+        )
 
     # =================================================================
     # STEP 3: Ordinal Encoding Rapat (0-based, consecutive)
@@ -199,18 +340,31 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None) -> tuple[pd.
     out_scaler_params = {} if scaler_params is None else scaler_params.copy()
 
     print('dataframe', df['Estimasi_Tarif_Per_kWh_Rp'] if 'Estimasi_Tarif_Per_kWh_Rp' in df.columns else 'N/A')
-    return df, out_scaler_params
+    return df, out_scaler_params, out_prob_params
 
 
 # =====================================================================
 # LOAD CSV + PREPROCESS
 # =====================================================================
 
-def load_and_preprocess(path: str) -> tuple[pd.DataFrame, dict]:
+def load_and_preprocess(path: str) -> tuple[pd.DataFrame, dict, dict]:
     """
     Baca CSV, lalu jalankan full preprocessing pipeline.
+    Returns: (df, minmax_scaler_params, prob_params)
     """
     df = pd.read_csv(path, encoding="utf-8-sig")
+
+    # Fit probability encoder SEBELUM binary mapping & OHE
+    # karena butuh nilai kategorikal asli untuk hitung probabilitas
+    prob_params = fit_probability_encoder(df)
+
+    print("\n=== PROBABILITY ENCODING PARAMS ===")
+    for enc_type, cols in prob_params.items():
+        for col, probs in cols.items():
+            print(f"  [{enc_type}] {col}:")
+            for cat, p in probs.items():
+                print(f"    {cat}: {p:.6f}")
+    print("=" * 50 + "\n")
 
     # Handle special numeric values
     if "Daya_Listrik_Rumah_VA" in df.columns:
@@ -236,9 +390,9 @@ def load_and_preprocess(path: str) -> tuple[pd.DataFrame, dict]:
             "Ya": 1,
         }).astype(float)
 
-    df, minmax_scaler_params = preprocess(df)
+    df, minmax_scaler_params, prob_params = preprocess(df, prob_params=prob_params)
 
-    return df, minmax_scaler_params
+    return df, minmax_scaler_params, prob_params
 
 
 # =====================================================================

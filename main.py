@@ -273,7 +273,7 @@ def run_training():
     print(f"=== Training model PRABAYAR ===\n")
     print(f"[INFO] Log transform: {cfg.get('use_log_transform', False)}")
 
-    rows, minmax_scaler_params = load_and_preprocess(cfg["dataset_path"])
+    rows, minmax_scaler_params, prob_params = load_and_preprocess(cfg["dataset_path"])
     print(f"Total data: {len(rows)} baris")
 
     # Extract features & target
@@ -316,6 +316,17 @@ def run_training():
         print(f"    {target_column}: {y_train_scaled[i]:.4f}")
     print("-" * 50 + "\n")
 
+    # Logging nilai mean dari setiap fitur (untuk Integrated Gradients baseline)
+    import numpy as np
+    x_train_array = np.array(x_train_scaled)
+    feature_means = np.mean(x_train_array, axis=0)
+    
+    print("\n=== FEATURE MEANS (Training Data - Scaled) ===")
+    print("Nilai mean ini dapat digunakan sebagai baseline untuk Integrated Gradients\n")
+    for i, col_name in enumerate(feature_columns):
+        print(f"  {col_name:<30}: {feature_means[i]:>10.6f}")
+    print("\n" + "=" * 70 + "\n")
+
     # Build layer sizes: [input, ...hidden..., 1]
     layer_sizes = [input_size] + cfg["hidden_layers"] + [1]
     print(f"Arsitektur Dense: {layer_sizes}")
@@ -348,6 +359,16 @@ def run_training():
     )
     total_epochs = len(history["train_loss"])
     print(f"Training selesai. Total epoch aktual: {total_epochs}")
+
+    # Logging bobot model untuk Integrated Gradients
+    print("\n=== MODEL WEIGHTS INFO (untuk Integrated Gradients) ===")
+    for i, w in enumerate(model.weights):
+        print(f"  Weight Layer {i+1} shape: {w.shape}")
+        print(f"    - Mean: {np.mean(w):.6f}")
+        print(f"    - Std:  {np.std(w):.6f}")
+        print(f"    - Min:  {np.min(w):.6f}")
+        print(f"    - Max:  {np.max(w):.6f}")
+    print("=" * 70 + "\n")
 
     contributions = model.get_feature_contributions()
 
@@ -398,6 +419,49 @@ def run_training():
         actual = y_test[i]
         selisih = errors_orig[i]
         print(f"Data {i+1:2d} | Aktual: {actual:>12,.2f} | Prediksi: {pred:>12,.2f} | Selisih: {selisih:>12,.2f}")
+
+    # === Simpan feature means untuk Integrated Gradients ===
+    feature_means_data = {
+        "feature_columns": feature_columns,
+        "feature_means": feature_means.tolist(),
+        "description": "Mean values of each feature from training data (scaled). Use as baseline for Integrated Gradients.",
+    }
+    feature_means_path = os.path.join(cfg["metrics_dir"], "feature_means.json")
+    with open(feature_means_path, "w", encoding="utf-8") as f:
+        json.dump(feature_means_data, f, indent=4, ensure_ascii=False)
+    print(f"Feature means disimpan ke: {feature_means_path}")
+
+    # === Simpan bobot model untuk Integrated Gradients ===
+    model_weights_data = {
+        "layer_sizes": layer_sizes,
+        "weights": [
+            {
+                "layer": i + 1,
+                "shape": list(w.shape),
+                "values": w.tolist(),
+                "statistics": {
+                    "mean": float(np.mean(w)),
+                    "std": float(np.std(w)),
+                    "min": float(np.min(w)),
+                    "max": float(np.max(w)),
+                }
+            }
+            for i, w in enumerate(model.weights)
+        ],
+        "biases": [
+            {
+                "layer": i + 1,
+                "shape": list(b.shape),
+                "values": b.tolist(),
+            }
+            for i, b in enumerate(model.biases)
+        ],
+        "description": "Model weights and biases for Integrated Gradients computation.",
+    }
+    weights_path = os.path.join(cfg["metrics_dir"], "model_weights.json")
+    with open(weights_path, "w", encoding="utf-8") as f:
+        json.dump(model_weights_data, f, indent=4, ensure_ascii=False)
+    print(f"Model weights disimpan ke: {weights_path}\n")
 
     # === Simpan metrics ===
     metrics_dir = cfg["metrics_dir"]
@@ -467,7 +531,9 @@ def run_training():
         "x_scaler": x_scaler,
         "y_scaler": y_scaler,
         "minmax_scaler_params": minmax_scaler_params,
+        "prob_params": prob_params,  # Probability encoding params
         "layer_sizes": layer_sizes,
+        "feature_means": feature_means.tolist(),  # Untuk Integrated Gradients baseline
     }
 
     model.save(cfg["model_path"], metadata=metadata)

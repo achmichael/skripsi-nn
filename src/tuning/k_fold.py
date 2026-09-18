@@ -163,7 +163,7 @@ def train_fold(
 def load_raw_data(model_type: str = "prabayar"):
     """Load and preprocess CSV, extract features. No train/test split, no scaling."""
     cfg = config[model_type]
-    df, _ = load_and_preprocess(cfg["dataset_path"])
+    df, _, _ = load_and_preprocess(cfg["dataset_path"])
     x_data, y_data, feat_cols, target_col = extract_features_and_target(df, model_type)
     n_features = len(feat_cols)
     return x_data, y_data, n_features, feat_cols
