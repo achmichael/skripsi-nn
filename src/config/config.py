@@ -1,4 +1,6 @@
-config = {
+from typing import Any
+
+config: dict[str, Any] = {
     "prabayar": {
         "dataset_path": "data/prabayar.csv",
         "model_path": "results/prabayar/models/model_prabayar.json",
@@ -16,6 +18,100 @@ config = {
         "target": "Token_Habis_Dalam_Hari",
         "use_log_transform": False,
         "asymmetric_alpha": 0.6,
+    },
+
+    # Capacity-specific model configurations
+    "capacity_configs": {
+        "450": {
+            "dataset_path": "data/prabayar_450.csv",
+            "model_path": "results/prabayar_450/models/model_prabayar_450.json",
+            "metrics_dir": "results/prabayar_450/metrics",
+            "layer_sizes": None,
+            "hidden_layers": [32, 16],  # Smaller network for smaller dataset (80 samples)
+            "learning_rate": 0.001,
+            "patience": 15,
+            "min_delta": 1e-5,
+            "clip_value": 5.0,
+            "batch_size": 8,  # Smaller batch for small dataset
+            "l2_lambda": 1e-2,  # Stronger regularization
+            "lr_decay": 0.001,
+            "target_label": "durasi token (hari)",
+            "target": "Token_Habis_Dalam_Hari",
+            "use_log_transform": False,
+            "asymmetric_alpha": 0.6,
+        },
+        "900": {
+            "dataset_path": "data/prabayar_900.csv",
+            "model_path": "results/prabayar_900/models/model_prabayar_900.json",
+            "metrics_dir": "results/prabayar_900/metrics",
+            "layer_sizes": None,
+            "hidden_layers": [128, 64],  # Full capacity model (259 samples - largest dataset)
+            "learning_rate": 0.001,
+            "patience": 10,
+            "min_delta": 1e-5,
+            "clip_value": 5.0,
+            "batch_size": 16,
+            "l2_lambda": 1e-1,
+            "lr_decay": 0.001,
+            "target_label": "durasi token (hari)",
+            "target": "Token_Habis_Dalam_Hari",
+            "use_log_transform": False,
+            "asymmetric_alpha": 0.6,
+        },
+        "1300": {
+            "dataset_path": "data/prabayar_1300.csv",
+            "model_path": "results/prabayar_1300/models/model_prabayar_1300.json",
+            "metrics_dir": "results/prabayar_1300/metrics",
+            "layer_sizes": None,
+            "hidden_layers": [64, 32],  # Medium network (149 samples)
+            "learning_rate": 0.001,
+            "patience": 10,
+            "min_delta": 1e-5,
+            "clip_value": 5.0,
+            "batch_size": 16,
+            "l2_lambda": 1e-1,
+            "lr_decay": 0.001,
+            "target_label": "durasi token (hari)",
+            "target": "Token_Habis_Dalam_Hari",
+            "use_log_transform": False,
+            "asymmetric_alpha": 0.6,
+        },
+        "2200": {
+            "dataset_path": "data/prabayar_2200.csv",
+            "model_path": "results/prabayar_2200/models/model_prabayar_2200.json",
+            "metrics_dir": "results/prabayar_2200/metrics",
+            "layer_sizes": None,
+            "hidden_layers": [64, 32],  # Medium network (141 samples)
+            "learning_rate": 0.001,
+            "patience": 10,
+            "min_delta": 1e-5,
+            "clip_value": 5.0,
+            "batch_size": 16,
+            "l2_lambda": 1e-1,
+            "lr_decay": 0.001,
+            "target_label": "durasi token (hari)",
+            "target": "Token_Habis_Dalam_Hari",
+            "use_log_transform": False,
+            "asymmetric_alpha": 0.6,
+        },
+        "3500": {
+            "dataset_path": "data/prabayar_3500.csv",
+            "model_path": "results/prabayar_3500/models/model_prabayar_3500.json",
+            "metrics_dir": "results/prabayar_3500/metrics",
+            "layer_sizes": None,
+            "hidden_layers": [16],  # Very simple network (only 11 samples!)
+            "learning_rate": 0.0005,
+            "patience": 20,
+            "min_delta": 1e-5,
+            "clip_value": 5.0,
+            "batch_size": 4,  # Very small batch
+            "l2_lambda": 5e-2,  # Very strong regularization
+            "lr_decay": 0.001,
+            "target_label": "durasi token (hari)",
+            "target": "Token_Habis_Dalam_Hari",
+            "use_log_transform": False,
+            "asymmetric_alpha": 0.6,
+        },
     },
 
     "features": {
@@ -91,20 +187,7 @@ config = {
             "Token_Nominal_Kategori",
             "Fisika_vs_Frekuensi_Gap",
             "Daya_x_TotalEnergi",
-            # "Kulkas_Energi_WhPerHari",
-            # "TV_Energi_WhPerHari",
             "AC_PK_Kategori",
-            # "AC_Energi_WhPerHari",
-            # "Kipas_Energi_WhPerHari",
-            # "RiceCooker_Energi_WhPerHari",
-            # "MesinCuci_Energi_WhPerHari",
-            # "Alat_Lain_1_Energi_WhPerHari",
-            # "Alat_Lain_2_Energi_WhPerHari",
-            # "Alat_Lain_3_Energi_WhPerHari",
-            # "Total_Energi_Alat_Lain_WhPerHari",
-            # "Total_Energi_Utama_WhPerHari",
-            # "Total_Energi_Semua_WhPerHari",
-            # "Estimasi_Tagihan_Dengan_PPJ_Admin_Rp"
         ],
     },
 

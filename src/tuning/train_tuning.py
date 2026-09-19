@@ -86,12 +86,20 @@ def predict_mlp(model, x_data):
 # DATA LOADING PIPELINE
 # =====================================================================
 
-def load_data(model_type: str = "prabayar"):
+def load_data(model_type: str = "prabayar", capacity: str = None):
     """
     Load CSV, jalankan pipeline preprocessing, split train/test (sebagai val),
     lalu lakukan standard scaling fitur dan target scaling.
+    
+    Args:
+        model_type: "prabayar"
+        capacity: Optional capacity category (e.g., "900") for capacity-specific training
     """
-    cfg = config[model_type]
+    # Select config based on capacity
+    if capacity and capacity in config.get("capacity_configs", {}):
+        cfg = config["capacity_configs"][capacity]
+    else:
+        cfg = config[model_type]
     
     # 1. Load dan preprocess CSV
     df, _, _ = load_and_preprocess(cfg["dataset_path"])
