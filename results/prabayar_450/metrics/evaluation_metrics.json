@@ -1,0 +1,33 @@
+{
+    "capacity": "450VA",
+    "model_type": "prabayar_450",
+    "arsitektur": [
+        93,
+        32,
+        16,
+        1
+    ],
+    "learning_rate": 0.001,
+    "batch_size": 8,
+    "total_epochs": 169,
+    "final_train_loss": 2.1842584662368553e-05,
+    "best_train_loss": 2.1842584662368553e-05,
+    "final_val_loss": 0.035666936486261104,
+    "best_val_loss": 0.03536024004546769,
+    "evaluasi_skala_asli": {
+        "rmse": 7.977996910940415,
+        "mae": 5.1111911415158255,
+        "mape": 31.493571562756934,
+        "r2": -0.12092186990993503
+    },
+    "data_info": {
+        "total_samples": 79,
+        "train_samples": 64,
+        "test_samples": 15,
+        "n_features": 93
+    },
+    "plots": {
+        "loss_curve": "results/prabayar_450/metrics/training_loss_curve.png",
+        "prediction_scatter": "results/prabayar_450/metrics/prediction_vs_actual.png"
+    }
+}

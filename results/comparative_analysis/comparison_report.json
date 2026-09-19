@@ -1,0 +1,130 @@
+{
+    "generated_at": "2026-09-18",
+    "models_compared": 5,
+    "comparison": [
+        {
+            "capacity": "450VA",
+            "total_samples": 79,
+            "train_samples": 64,
+            "test_samples": 15,
+            "architecture": [
+                93,
+                32,
+                16,
+                1
+            ],
+            "total_epochs": 169,
+            "rmse": 7.977996910940415,
+            "mae": 5.1111911415158255,
+            "mape": 31.493571562756934,
+            "r2": -0.12092186990993503,
+            "learning_rate": 0.001,
+            "batch_size": 8
+        },
+        {
+            "capacity": "900VA",
+            "total_samples": 258,
+            "train_samples": 207,
+            "test_samples": 51,
+            "architecture": [
+                93,
+                128,
+                64,
+                1
+            ],
+            "total_epochs": 198,
+            "rmse": 3.121088836982542,
+            "mae": 2.331488813559417,
+            "mape": 20.721104779151307,
+            "r2": 0.8334416936023887,
+            "learning_rate": 0.001,
+            "batch_size": 16
+        },
+        {
+            "capacity": "1300VA",
+            "total_samples": 148,
+            "train_samples": 119,
+            "test_samples": 29,
+            "architecture": [
+                93,
+                64,
+                32,
+                1
+            ],
+            "total_epochs": 199,
+            "rmse": 4.029655543315712,
+            "mae": 2.5848866929749392,
+            "mape": 23.91160511597539,
+            "r2": 0.5476561075214039,
+            "learning_rate": 0.001,
+            "batch_size": 16
+        },
+        {
+            "capacity": "2200VA",
+            "total_samples": 140,
+            "train_samples": 112,
+            "test_samples": 28,
+            "architecture": [
+                93,
+                64,
+                32,
+                1
+            ],
+            "total_epochs": 17,
+            "rmse": 10.323296550082953,
+            "mae": 7.660428391136882,
+            "mape": 52.703683772453516,
+            "r2": -0.3808523658781362,
+            "learning_rate": 0.001,
+            "batch_size": 16
+        },
+        {
+            "capacity": "3500VA",
+            "total_samples": 10,
+            "train_samples": 8,
+            "test_samples": 2,
+            "architecture": [
+                93,
+                16,
+                1
+            ],
+            "total_epochs": 3826,
+            "rmse": 0.307710630997254,
+            "mae": 0.30750584552635063,
+            "mape": 3.148060672168763,
+            "r2": 0.9962125667028509,
+            "learning_rate": 0.0005,
+            "batch_size": 4
+        }
+    ],
+    "statistics": {
+        "rmse": {
+            "mean": 5.151949694463775,
+            "std": 3.5659490534510803,
+            "min": 0.307710630997254,
+            "max": 10.323296550082953,
+            "best_capacity": "3500VA"
+        },
+        "mae": {
+            "mean": 3.5991001769426822,
+            "std": 2.5397191478904153,
+            "min": 0.30750584552635063,
+            "max": 7.660428391136882,
+            "best_capacity": "3500VA"
+        },
+        "mape": {
+            "mean": 26.395605180501185,
+            "std": 16.105420188416886,
+            "min": 3.148060672168763,
+            "max": 52.703683772453516,
+            "best_capacity": "3500VA"
+        },
+        "r2": {
+            "mean": 0.3751072264077145,
+            "std": 0.5372402094962816,
+            "min": -0.3808523658781362,
+            "max": 0.9962125667028509,
+            "best_capacity": "3500VA"
+        }
+    }
+}

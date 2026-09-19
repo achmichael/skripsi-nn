@@ -1,0 +1,33 @@
+{
+    "capacity": "2200VA",
+    "model_type": "prabayar_2200",
+    "arsitektur": [
+        93,
+        64,
+        32,
+        1
+    ],
+    "learning_rate": 0.001,
+    "batch_size": 16,
+    "total_epochs": 17,
+    "final_train_loss": 0.004441875486749998,
+    "best_train_loss": 0.004441875486749998,
+    "final_val_loss": 0.08712654847639249,
+    "best_val_loss": 0.07882429896774579,
+    "evaluasi_skala_asli": {
+        "rmse": 10.323296550082953,
+        "mae": 7.660428391136882,
+        "mape": 52.703683772453516,
+        "r2": -0.3808523658781362
+    },
+    "data_info": {
+        "total_samples": 140,
+        "train_samples": 112,
+        "test_samples": 28,
+        "n_features": 93
+    },
+    "plots": {
+        "loss_curve": "results/prabayar_2200/metrics/training_loss_curve.png",
+        "prediction_scatter": "results/prabayar_2200/metrics/prediction_vs_actual.png"
+    }
+}
