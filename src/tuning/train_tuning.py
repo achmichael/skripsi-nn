@@ -98,8 +98,15 @@ def load_data(model_type: str = "prabayar", capacity: str = None):
     # Select config based on capacity
     if capacity and capacity in config.get("capacity_configs", {}):
         cfg = config["capacity_configs"][capacity]
+    elif model_type.startswith("prabayar_") and not capacity:
+        # Extract capacity from model_type (e.g., "prabayar_900" -> "900")
+        cap = model_type.split("_")[1]
+        if cap in config.get("capacity_configs", {}):
+            cfg = config["capacity_configs"][cap]
+        else:
+            cfg = config["prabayar"]
     else:
-        cfg = config[model_type]
+        cfg = config["prabayar"]  # fallback to base prabayar
     
     # 1. Load dan preprocess CSV
     df, _, _ = load_and_preprocess(cfg["dataset_path"])

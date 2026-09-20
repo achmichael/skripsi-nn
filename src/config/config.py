@@ -2,7 +2,7 @@ from typing import Any
 
 config: dict[str, Any] = {
     "prabayar": {
-        "dataset_path": "data/prabayar.csv",
+        "dataset_path": "data/prabayar_450.csv",
         "model_path": "results/prabayar/models/model_prabayar.json",
         "metrics_dir": "results/prabayar/metrics",
         "layer_sizes": None, # set dynamically: [input, 64, 32, 1]
@@ -24,11 +24,11 @@ config: dict[str, Any] = {
     "capacity_configs": {
         "450": {
             "dataset_path": "data/prabayar_450.csv",
-            "model_path": "results/prabayar_450/models/model_prabayar_450.json",
-            "metrics_dir": "results/prabayar_450/metrics",
+            "model_path": "results/prabayar_450/models/model_prabayar_450_tl.json",
+            "metrics_dir": "results/prabayar_450/metrics_tl",
             "layer_sizes": None,
-            "hidden_layers": [32, 16],  # Smaller network for smaller dataset (80 samples)
-            "learning_rate": 0.001,
+            "hidden_layers": [128, 64],  # Changed for transfer learning to match base model
+            "learning_rate": 0.0001, # Smaller LR for fine-tuning
             "patience": 15,
             "min_delta": 1e-5,
             "clip_value": 5.0,
@@ -42,11 +42,11 @@ config: dict[str, Any] = {
         },
         "900": {
             "dataset_path": "data/prabayar_900.csv",
-            "model_path": "results/prabayar_900/models/model_prabayar_900.json",
-            "metrics_dir": "results/prabayar_900/metrics",
+            "model_path": "results/prabayar_900/models/model_prabayar_900_tl.json",
+            "metrics_dir": "results/prabayar_900/metrics_tl",
             "layer_sizes": None,
             "hidden_layers": [128, 64],  # Full capacity model (259 samples - largest dataset)
-            "learning_rate": 0.001,
+            "learning_rate": 0.00001,
             "patience": 10,
             "min_delta": 1e-5,
             "clip_value": 5.0,
@@ -60,11 +60,11 @@ config: dict[str, Any] = {
         },
         "1300": {
             "dataset_path": "data/prabayar_1300.csv",
-            "model_path": "results/prabayar_1300/models/model_prabayar_1300.json",
-            "metrics_dir": "results/prabayar_1300/metrics",
+            "model_path": "results/prabayar_1300/models/model_prabayar_1300_tl.json",
+            "metrics_dir": "results/prabayar_1300/metrics_tl",
             "layer_sizes": None,
-            "hidden_layers": [64, 32],  # Medium network (149 samples)
-            "learning_rate": 0.001,
+            "hidden_layers": [128, 64],  # Medium network (149 samples)
+            "learning_rate": 0.0001,
             "patience": 10,
             "min_delta": 1e-5,
             "clip_value": 5.0,
@@ -78,11 +78,11 @@ config: dict[str, Any] = {
         },
         "2200": {
             "dataset_path": "data/prabayar_2200.csv",
-            "model_path": "results/prabayar_2200/models/model_prabayar_2200.json",
-            "metrics_dir": "results/prabayar_2200/metrics",
+            "model_path": "results/prabayar_2200/models/model_prabayar_2200_tl.json",
+            "metrics_dir": "results/prabayar_2200/metrics_tl",
             "layer_sizes": None,
-            "hidden_layers": [64, 32],  # Medium network (141 samples)
-            "learning_rate": 0.001,
+            "hidden_layers": [128, 64],  # Medium network (141 samples)
+            "learning_rate": 0.0001,
             "patience": 10,
             "min_delta": 1e-5,
             "clip_value": 5.0,
@@ -96,11 +96,11 @@ config: dict[str, Any] = {
         },
         "3500": {
             "dataset_path": "data/prabayar_3500.csv",
-            "model_path": "results/prabayar_3500/models/model_prabayar_3500.json",
-            "metrics_dir": "results/prabayar_3500/metrics",
+            "model_path": "results/prabayar_3500/models/model_prabayar_3500_tl.json",
+            "metrics_dir": "results/prabayar_3500/metrics_tl",
             "layer_sizes": None,
-            "hidden_layers": [16],  # Very simple network (only 11 samples!)
-            "learning_rate": 0.0005,
+            "hidden_layers": [128, 64],  # Very simple network (only 11 samples!)
+            "learning_rate": 0.0001,
             "patience": 20,
             "min_delta": 1e-5,
             "clip_value": 5.0,

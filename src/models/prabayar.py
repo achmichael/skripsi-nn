@@ -60,6 +60,32 @@ class PrabayarModel(NeuralNetwork):
         self._activations: list[np.ndarray] = []
         self._pre_activations: list[np.ndarray] = []
 
+    def load_weights_from(self, source_model_path: str, freeze_layers: int = 0) -> None:
+        """
+        Transfer learning: load weights from a pre-trained model.
+        Shapes must match.
+        """
+        with open(source_model_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        source_weights = [np.array(w, dtype=np.float32) for w in data["weights"]]
+        source_biases = [np.array(b, dtype=np.float32) for b in data["biases"]]
+
+        if len(source_weights) != len(self.weights):
+            raise ValueError(f"Number of layers mismatch: source has {len(source_weights)}, target has {len(self.weights)}")
+
+        for i in range(len(self.weights)):
+            if source_weights[i].shape != self.weights[i].shape:
+                 raise ValueError(f"Shape mismatch at layer {i}: source {source_weights[i].shape}, target {self.weights[i].shape}")
+            self.weights[i] = source_weights[i].copy()
+            self.biases[i] = source_biases[i].copy()
+
+        print('bobot copy', self.weights[i])
+        print(f'\n biases', self.biases[i])
+        
+        self.frozen_layers = freeze_layers
+        print(f"Transfer learning: loaded weights from {source_model_path}. Frozen first {freeze_layers} layers.")
+
     def forward(self, inputs: np.ndarray) -> np.ndarray:
         self._activations = [inputs]
         self._pre_activations = []
@@ -149,7 +175,12 @@ class PrabayarModel(NeuralNetwork):
         self.t += 1
 
         # 3. Update bobot dan bias
+        frozen_layers = getattr(self, "frozen_layers", 0)
+
         for l in range(self.num_layers - 1):
+            if l < frozen_layers:
+                continue # Skip update for frozen layers
+
             inputs_l = self._activations[l]
 
             grad_w = np.dot(deltas[l].T, inputs_l)

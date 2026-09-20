@@ -191,7 +191,6 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None, prob_params:
     Full preprocessing pipeline untuk model prabayar.
     """
     df = df.copy()
-    print('df', df)
 
     # =================================================================
     # STEP 1: Noise Removal & Manual Mode Imputation
@@ -228,8 +227,6 @@ def preprocess(df: pd.DataFrame, scaler_params: dict | None = None, prob_params:
             df[col_name] = (df[col] == cat).astype(int)
 
         df = df.drop(columns=[col])
-
-    print('df setelah one hot', df)
 
     # =================================================================
     # STEP 2b: Probability Encoding

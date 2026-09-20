@@ -23,11 +23,26 @@ def extract_features_and_target(
     if df.empty:
         raise ValueError("Data kosong.")
 
-    if model_type not in config["features"]:
+    # Determine base model type to fetch correct features
+    base_model_type = "prabayar" if model_type.startswith("prabayar") else model_type
+
+    if base_model_type not in config["features"]:
         raise ValueError(f"Model type '{model_type}' tidak dikenal. Gunakan 'prabayar'.")
 
-    feature_columns = config["features"][model_type]
-    target_column = config[model_type]["target"]
+    feature_columns = config["features"][base_model_type]
+
+    # Get target column from specific capacity config if available
+    if model_type.startswith("prabayar_") and "_" in model_type:
+        cap = model_type.split("_")[1]
+        if cap in config.get("capacity_configs", {}):
+            target_column = config["capacity_configs"][cap]["target"]
+            use_log = config["capacity_configs"][cap].get("use_log_transform", False)
+        else:
+            target_column = config["prabayar"]["target"]
+            use_log = config["prabayar"].get("use_log_transform", False)
+    else:
+        target_column = config[base_model_type]["target"]
+        use_log = config[base_model_type].get("use_log_transform", False)
 
     # Validate columns exist
     available_columns = list(df.columns)
@@ -54,10 +69,6 @@ def extract_features_and_target(
 
     feature_columns = resolved_columns
 
-    for col in feature_columns:
-        print('col', col)
-
-    print('feature_columns length', len(feature_columns))
     if target_column not in available_columns:
         raise ValueError(f"Kolom target '{target_column}' tidak ditemukan di dataset.")
 
@@ -69,6 +80,10 @@ def extract_features_and_target(
     x_data = x_df.values.tolist()
 
     # 2. Ekstrak Target
-    y_data = df[target_column].values.tolist()
+    y_raw = df[target_column].astype(float).values
+    if use_log:
+        y_data = np.log1p(np.maximum(y_raw, 0)).tolist()
+    else:
+        y_data = y_raw.tolist()
 
     return x_data, y_data, feature_columns, target_column

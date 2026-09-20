@@ -1,7 +1,8 @@
 """
 grid_search.py (Successive Halving / Random Search)
 
-Hyperparameter tuning untuk model Prabayar.
+Hyperparameter tuning untuk model Prabayar dan Capacity-specific models.
+Mendukung tuning untuk 450VA, 900VA, 1300VA, 2200VA, 3500VA.
 """
 
 import copy
@@ -24,6 +25,7 @@ from src.tuning.train_tuning import (
 )
 
 from src.models.prabayar import PrabayarModel
+from src.models.model_factory import get_model_class_for_capacity, get_available_capacities
 from src.pipeline.preprocessing import inverse_transform_target
 
 
@@ -54,10 +56,11 @@ def sample_param_pool(param_grid: dict, n_samples: int, seed: int = 42) -> list[
 
 
 # =====================================================================
-# GRID DEFINITION — PRABAYAR ONLY
+# GRID DEFINITION — PRABAYAR & CAPACITY MODELS
 # =====================================================================
 
 def get_search_space_prabayar(n_features: int) -> dict:
+    """Search space for unified Prabayar model."""
     return {
         "layer_sizes": [
             [n_features, 32, 1],
@@ -75,6 +78,88 @@ def get_search_space_prabayar(n_features: int) -> dict:
         "l2_lambda": [0.0, 1e-5, 1e-4, 1e-3, 1e-2],
         "clip_value": [5.0, 10.0, 15.0],
         "batch_size": [16, 32, 64, 128],
+    }
+
+
+def get_search_space_capacity(n_features: int, capacity: str, n_samples: int) -> dict:
+    """
+    Search space for capacity-specific models.
+    Adapted based on dataset size to prevent overfitting.
+    
+    Args:
+        n_features: Number of input features
+        capacity: Capacity category ("450", "900", "1300", "2200", "3500")
+        n_samples: Number of training samples
+    
+    Returns:
+        Parameter search space dictionary
+    """
+    # Adjust architecture complexity based on dataset size
+    # Rule of thumb: Total params < n_samples / 10
+    
+    if n_samples < 20:  # Tiny dataset (3500VA with ~11 samples)
+        layer_sizes = [
+            [n_features, 8, 1],
+            [n_features, 16, 1],
+            [n_features, 12, 1],
+            [n_features, 16, 8, 1],
+        ]
+        learning_rates = [1e-4, 5e-4, 1e-3]
+        l2_lambdas = [1e-3, 1e-2, 5e-2]  # Strong regularization
+        batch_sizes = [4, 8]
+        clip_values = [5.0, 10.0]
+    
+    elif n_samples < 100:  # Small dataset (450VA with ~80 samples, 2200VA with ~141)
+        layer_sizes = [
+            [n_features, 16, 1],
+            [n_features, 32, 1],
+            [n_features, 24, 1],
+            [n_features, 32, 16, 1],
+            [n_features, 24, 12, 1],
+            [n_features, 16, 8, 1],
+        ]
+        learning_rates = [1e-4, 5e-4, 1e-3]
+        l2_lambdas = [1e-4, 1e-3, 1e-2]
+        batch_sizes = [8, 16, 32]
+        clip_values = [5.0, 10.0, 15.0]
+    
+    elif n_samples < 200:  # Medium dataset (1300VA with ~149)
+        layer_sizes = [
+            [n_features, 32, 1],
+            [n_features, 64, 1],
+            [n_features, 48, 1],
+            [n_features, 64, 32, 1],
+            [n_features, 48, 24, 1],
+            [n_features, 32, 16, 1],
+            [n_features, 64, 16, 1],
+        ]
+        learning_rates = [5e-5, 1e-4, 5e-4, 1e-3]
+        l2_lambdas = [0.0, 1e-5, 1e-4, 1e-3, 1e-2]
+        batch_sizes = [16, 32, 64]
+        clip_values = [5.0, 10.0, 15.0]
+    
+    else:  # Large dataset (900VA with ~259 samples)
+        layer_sizes = [
+            [n_features, 64, 1],
+            [n_features, 128, 1],
+            [n_features, 96, 1],
+            [n_features, 128, 64, 1],
+            [n_features, 96, 48, 1],
+            [n_features, 64, 32, 1],
+            [n_features, 128, 32, 1],
+            [n_features, 96, 32, 1],
+        ]
+        learning_rates = [5e-5, 1e-4, 5e-4, 1e-3]
+        l2_lambdas = [0.0, 1e-5, 1e-4, 1e-3, 1e-2]
+        batch_sizes = [16, 32, 64, 128]
+        clip_values = [5.0, 10.0, 15.0]
+    
+    return {
+        "layer_sizes": layer_sizes,
+        "learning_rate": learning_rates,
+        "l2_lambda": l2_lambdas,
+        "clip_value": clip_values,
+        "batch_size": batch_sizes,
     }
 
 
@@ -237,6 +322,7 @@ def run_successive_halving(
 # =====================================================================
 
 def tune_prabayar(x_train, y_train, x_val, y_val, y_val_orig, n_features, y_scaler, cfg: HalvingConfig):
+    """Tune unified Prabayar model."""
     space = get_search_space_prabayar(n_features)
     pool = sample_param_pool(space, cfg.n_initial_candidates, seed=cfg.seed)
 
@@ -247,38 +333,180 @@ def tune_prabayar(x_train, y_train, x_val, y_val, y_val_orig, n_features, y_scal
     return run_successive_halving(_eval_mlp_candidate, build_args, pool, cfg)
 
 
+def tune_capacity_model(
+    capacity: str,
+    x_train, y_train, 
+    x_val, y_val, y_val_orig,
+    n_features, y_scaler,
+    cfg: HalvingConfig
+):
+    """
+    Tune capacity-specific model with adaptive search space.
+    
+    Args:
+        capacity: Capacity category ("450", "900", "1300", "2200", "3500")
+        x_train, y_train: Training data
+        x_val, y_val, y_val_orig: Validation data
+        n_features: Number of features
+        y_scaler: Target scaler
+        cfg: Halving configuration
+    
+    Returns:
+        List of results sorted by performance
+    """
+    ModelClass = get_model_class_for_capacity(capacity)
+    n_samples = len(x_train)
+    
+    space = get_search_space_capacity(n_features, capacity, n_samples)
+    pool = sample_param_pool(space, cfg.n_initial_candidates, seed=cfg.seed)
+
+    def build_args(params, budget, patience):
+        return (ModelClass, params, budget, patience,
+                x_train, y_train, x_val, y_val, y_val_orig, y_scaler)
+
+    return run_successive_halving(_eval_mlp_candidate, build_args, pool, cfg)
+
+
 # =====================================================================
 # MAIN
 # =====================================================================
 
 def main():
-    cfg = HalvingConfig(
-        n_initial_candidates=200,
-        rung_epochs=(30, 90, 270),
-        eta=3,
-        patience_per_rung=(10, 15, 25),
-        n_workers=None,
-        seed=42,
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Grid search tuning for Prabayar models")
+    parser.add_argument(
+        "--capacity",
+        type=str,
+        choices=["base", "450", "900", "1300", "2200", "3500", "all"],
+        default="base",
+        help="Capacity to tune (base=unified model, or specific capacity, or all)"
     )
-
-    print("\n" + "▓" * 70)
-    print("  LOADING DATA: Prabayar")
-    print("▓" * 70)
-    (x_tr_r, x_va_r, y_tr_r, y_va_r, y_va_orig_r, n_feat_r, yscaler_r, _) = load_data("prabayar")
-    print(f"  Train: {len(x_tr_r)} | Val: {len(x_va_r)} | Fitur: {n_feat_r}")
-    results_pra = tune_prabayar(x_tr_r, y_tr_r, x_va_r, y_va_r, y_va_orig_r, n_feat_r, yscaler_r, cfg)
-
-    print("\n" + "▓" * 70)
-    print("  RINGKASAN")
-    print("▓" * 70)
-    valid = [r for r in results_pra if not r.get("diverged")]
-    print(f"\n  PrabayarModel: {len(valid)}/{len(results_pra)} konvergen di rung terakhir")
-    if valid:
-        best = valid[0]
-        print(f"    RMSE={best['rmse']:.4f}  MAE={best['mae']:.4f}  "
-              f"MAPE={best['mape']:.4f}%  R²={best['r2']:.6f}  "
-              f"best_epoch={best.get('best_epoch')}")
-        print(f"    Params: {best['params']}")
+    parser.add_argument(
+        "--n-candidates",
+        type=int,
+        default=200,
+        help="Number of initial candidates (default: 200)"
+    )
+    parser.add_argument(
+        "--rung-epochs",
+        type=str,
+        default="30,90,270",
+        help="Comma-separated epoch budgets per rung (default: 30,90,270)"
+    )
+    parser.add_argument(
+        "--eta",
+        type=int,
+        default=3,
+        help="Halving factor (default: 3)"
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=None,
+        help="Number of parallel workers (default: auto)"
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=42,
+        help="Random seed (default: 42)"
+    )
+    
+    args = parser.parse_args()
+    
+    rung_epochs = tuple(int(x) for x in args.rung_epochs.split(","))
+    patience_per_rung = tuple(min(15, ep // 3) for ep in rung_epochs)
+    
+    cfg = HalvingConfig(
+        n_initial_candidates=args.n_candidates,
+        rung_epochs=rung_epochs,
+        eta=args.eta,
+        patience_per_rung=patience_per_rung,
+        n_workers=args.workers,
+        seed=args.seed,
+    )
+    
+    print("\n" + "═" * 70)
+    print("  HYPERPARAMETER TUNING - PRABAYAR MODELS")
+    print("═" * 70)
+    print(f"  Configuration:")
+    print(f"    - Initial candidates: {cfg.n_initial_candidates}")
+    print(f"    - Rung epochs: {cfg.rung_epochs}")
+    print(f"    - Eta (halving factor): {cfg.eta}")
+    print(f"    - Patience per rung: {cfg.patience_per_rung}")
+    print(f"    - Workers: {cfg.n_workers or 'auto'}")
+    print(f"    - Seed: {cfg.seed}")
+    print("═" * 70)
+    
+    all_results = {}
+    
+    # Determine which capacities to tune
+    if args.capacity == "all":
+        capacities = ["450", "900", "1300", "2200", "3500"]
+    elif args.capacity == "base":
+        capacities = ["base"]
+    else:
+        capacities = [args.capacity]
+    
+    for capacity in capacities:
+        dataset_name = "prabayar" if capacity == "base" else f"prabayar_{capacity}"
+        
+        print(f"\n" + "▓" * 70)
+        print(f"  LOADING DATA: {dataset_name.upper()}")
+        print("▓" * 70)
+        
+        try:
+            (x_tr, x_va, y_tr, y_va, y_va_orig, n_feat, yscaler, _) = load_data(dataset_name)
+            print(f"  Train: {len(x_tr)} | Val: {len(x_va)} | Fitur: {n_feat}")
+            
+            print(f"\n  Starting tuning for {dataset_name}...")
+            t_start = time.time()
+            
+            if capacity == "base":
+                results = tune_prabayar(x_tr, y_tr, x_va, y_va, y_va_orig, n_feat, yscaler, cfg)
+            else:
+                results = tune_capacity_model(capacity, x_tr, y_tr, x_va, y_va, y_va_orig, n_feat, yscaler, cfg)
+            
+            elapsed = time.time() - t_start
+            print(f"\n  Tuning completed in {elapsed/60:.1f} minutes")
+            
+            all_results[capacity] = results
+            
+        except Exception as e:
+            print(f"  ❌ Error tuning {dataset_name}: {e}")
+            import traceback
+            traceback.print_exc()
+            continue
+    
+    # Print summary
+    print("\n" + "═" * 70)
+    print("  TUNING SUMMARY")
+    print("═" * 70)
+    
+    for capacity, results in all_results.items():
+        dataset_name = "PrabayarModel (unified)" if capacity == "base" else f"Prabayar{capacity}Model"
+        valid = [r for r in results if not r.get("diverged")]
+        print(f"\n  {dataset_name}:")
+        print(f"    Converged: {len(valid)}/{len(results)} candidates")
+        
+        if valid:
+            best = valid[0]
+            print(f"    Best metrics:")
+            print(f"      RMSE  = {best['rmse']:.4f}")
+            print(f"      MAE   = {best['mae']:.4f}")
+            print(f"      MAPE  = {best['mape']:.4f}%")
+            print(f"      R²    = {best['r2']:.6f}")
+            print(f"      Epoch = {best.get('best_epoch')}")
+            print(f"    Best params:")
+            for key, val in best['params'].items():
+                print(f"      {key}: {val}")
+        else:
+            print(f"    ⚠️  No converged candidates!")
+    
+    print("\n" + "═" * 70)
+    print("  Tuning complete! Use best parameters in config files.")
+    print("═" * 70)
 
 
 if __name__ == "__main__":
