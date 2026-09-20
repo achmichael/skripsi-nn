@@ -7,3 +7,4 @@ results/tuning/grid_search_*.json
 *.md
 graphify-out/
 frontend/*
+results/**/metrics_*/
