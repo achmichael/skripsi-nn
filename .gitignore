@@ -8,3 +8,4 @@ results/tuning/grid_search_*.json
 graphify-out/
 frontend/*
 results/**/metrics_*/
+results/comparative_analysis/
